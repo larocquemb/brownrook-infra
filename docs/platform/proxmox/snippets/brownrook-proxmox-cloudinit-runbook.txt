@@ -1,0 +1,105 @@
+BROWNROOK INFRASTRUCTURE Proxmox Cloud-Init + Networking Runbook (Plain
+Text Edition)
+
+====================================================================
+PART 1 — APPLY CLOUD-INIT SNIPPET ON PROXMOX
+====================================================================
+
+Preconditions: Verify snippet storage is enabled:
+
+grep -n “dir: local” -A3 /etc/pve/storage.cfg
+
+Must include: path /var/lib/vz content … snippets
+
+  --------------------------------------------------------------------
+  STEP 1 — Install Snippet on PVE
+  --------------------------------------------------------------------
+  STEP 2 — Attach Snippet to VM
+
+  qm set 300 –cicustom “user=local:snippets/300-userdata.yaml”
+
+  Verify:
+
+  qm config 300 | grep cicustom
+  --------------------------------------------------------------------
+
+STEP 3 — Regenerate Cloud-Init ISO
+
+qm stop 300 || true qm cloudinit update 300 qm start 300
+
+  -----------------------------------------------------------------------
+            STEP 4 — Verify ISO Contents (Optional Deep Check)
+  -----------------------------------------------------------------------
+                         STEP 5 — Verify Inside VM
+
+                       sudo cloud-init status –long
+
+                            Check SSH settings:
+
+                           sudo sshd -T | egrep
+   ‘passwordauthentication|permitrootlogin|kbdinteractiveauthentication’
+
+   ====================================================================
+       PART 2 — STATIC NETWORK CONFIGURATION (RHEL / NETWORKMANAGER)
+   ====================================================================
+
+                         Identify Connection Name:
+
+        nmcli connection show nmcli -f NAME,DEVICE connection show
+  -----------------------------------------------------------------------
+
+Set Static IPv4 Address:
+
+nmcli connection modify “cloud-init eth0” ipv4.method manual
+ipv4.addresses 192.168.2.230/24 ipv4.gateway 192.168.2.1 ipv4.dns
+192.168.2.250 ipv4.dns-search “brownrook.net,brownrook.com” ipv6.method
+ignore
+
+  --------------------------------------------------------------------
+  Apply Changes:
+  --------------------------------------------------------------------
+  Verify Network:
+
+  ip addr show eth0 cat /etc/resolv.conf nmcli device show eth0 | grep
+  IP4
+
+  Expected: IPv4: 192.168.2.230 Gateway: 192.168.2.1 DNS:
+  192.168.2.250
+  --------------------------------------------------------------------
+
+Optional: Rename Connection to eth0
+
+nmcli connection modify “cloud-init eth0” connection.id eth0 nmcli
+connection up eth0
+
+------------------------------------------------------------------------
+
+Disable Cloud-Init Network Rewrites (Recommended for Static Servers)
+
+echo “network: {config: disabled}” | sudo tee
+/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg sudo cloud-init
+clean sudo reboot
+
+====================================================================
+VALIDATION TESTS
+====================================================================
+
+From workstation:
+
+ssh paul@k3s1.brownrook.net
+
+Root login must fail:
+
+ssh root@k3s1.brownrook.net
+
+====================================================================
+NOTES
+====================================================================
+
+Cloud-init only applies once unless cleaned:
+
+sudo cloud-init clean sudo reboot
+
+Proxmox regenerates the cloud-init ISO only when:
+
+qm cloudinit update

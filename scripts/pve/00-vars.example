@@ -1,0 +1,13 @@
+export PVE_NODE="pve"
+export TEMPLATE_VMID="9100"
+export K3S1_VMID="300"
+
+export STORAGE_LVMTHIN="local-lvm"
+export STORAGE_SNIPPETS="local"
+
+export RHEL_QCOW2="/var/lib/vz/template/iso/rhel-10.1-x86_64-kvm.qcow2"
+export SNIPPET_USERDATA="/var/lib/vz/snippets/300-userdata.yaml"
+
+export K3S1_IP="192.168.2.230/24"
+export K3S1_GW="192.168.2.1"
+export K3S1_DNS="192.168.2.250"

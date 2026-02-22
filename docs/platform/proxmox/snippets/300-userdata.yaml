@@ -1,0 +1,37 @@
+#cloud-config
+hostname: k3s1
+fqdn: k3s1.brownrook.net
+manage_etc_hosts: false
+
+users:
+  - name: paul
+    groups: [wheel]
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    shell: /bin/bash
+    lock_passwd: false
+    ssh_authorized_keys:
+      - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC1x47RFvQrYqVXtBiOQ5O448JZqDp1JbRCfWhUBMoSrv2bS51TE4OnVMFuzINnuVzkEtEjrpQ6CiWUIHHW+Xvhl+chUyf2fcShznlym31pW2aIRT3f0XQJuEZLhbGtxFoKXSCB0h+iXL9CUlQHZSa/nXQ7ox4+XAk6gI15DCypc5Mtq3x7zX0CJWWawS7wRuemQgpuK1I2NjhxXyFANTaFu10UhHfYRLjBUjSeahXh7LIlQqAzlfmceZxspN8OArtXHW/y/C1OWf96kglOi5qmmdxLYOAY67qYOuRSz1xJPwLw9v+AveHAMN940ZO4W+gUUQrhcZ9E8FN5M7+8MnyEYECgVcbfxv7PDad45Mc8KGoEVpIGpZQS82l4PhJpbIIa+ibc/cir191nzIBTvwpY8chRfRTrcUag0wNMkI8LHwrjYBNfmsYO+jiZkC++2yNS6oq4InakBEjXNPMsSEZUM4Ly7+B0wLUsTcYiMdJdMVlbDZ6Mc2J+//Xv3Ld2MXE= paul@Pauls-Mac-mini"
+
+ssh_pwauth: true
+chpasswd:
+  list: |
+    root:brownrook
+    paul:brownrook
+  expire: false
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/99-brownrook.conf
+    permissions: "0644"
+    content: |
+      PasswordAuthentication yes
+      KbdInteractiveAuthentication yes
+      PermitRootLogin no
+
+runcmd:
+  - rm -f /etc/ssh/sshd_config.d/50-cloud-init.conf
+  - ssh-keygen -A
+  - systemctl enable --now sshd
+  - systemctl restart sshd
+
+final_message: "cloud-init complete"
+
