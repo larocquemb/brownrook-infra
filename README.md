@@ -84,6 +84,7 @@ This repository supports:
 ✔ Certbot integration  
 ✔ Structured Terraform module layout  
 
+<<<<<<< HEAD
 ---
 
 # Phase 1 Scope
@@ -104,3 +105,27 @@ This repository supports:
 - Automated certificate rotation
 - Multi-tenant identity
 - Fine-grained RBAC
+=======
+## Identity Trust Model
+
+IDC acts as a resource server and enforces token-based trust.
+
+A request is accepted if and only if:
+
+ValidSignature ∧
+IssuerMatch ∧
+AudienceMatch ∧
+NotExpired ∧
+ScopeSatisfied
+
+Trust Anchor:
+- Microsoft Entra ID Tenant (tid: 8b07f4bd-41e4-4106-8d49-00c5d79d35a2)
+
+The system does not trust:
+- Tokens from other tenants
+- Tokens signed by unknown keys
+- Tokens missing required scope
+- Expired tokens
+- Tokens with incorrect audience
+
+>>>>>>> c2271feaa12c0a7e367634b3c50e84bb8c58af54
