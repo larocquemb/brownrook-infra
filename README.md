@@ -84,3 +84,23 @@ This repository supports:
 ✔ Certbot integration  
 ✔ Structured Terraform module layout  
 
+---
+
+# Phase 1 Scope
+
+## Included
+
+- Minimal IDC API service
+- JWT validation middleware
+- Public `/health` endpoint
+- Secured `/secure` endpoint
+- Reverse proxy front-end (nginx)
+- Structured architecture and security documentation
+
+## Excluded (Phase 2)
+
+- mTLS between services
+- Private CA integration
+- Automated certificate rotation
+- Multi-tenant identity
+- Fine-grained RBAC
