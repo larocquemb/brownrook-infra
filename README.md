@@ -84,3 +84,25 @@ This repository supports:
 ✔ Certbot integration  
 ✔ Structured Terraform module layout  
 
+## Identity Trust Model
+
+IDC acts as a resource server and enforces token-based trust.
+
+A request is accepted if and only if:
+
+ValidSignature ∧
+IssuerMatch ∧
+AudienceMatch ∧
+NotExpired ∧
+ScopeSatisfied
+
+Trust Anchor:
+- Microsoft Entra ID Tenant (tid: 8b07f4bd-41e4-4106-8d49-00c5d79d35a2)
+
+The system does not trust:
+- Tokens from other tenants
+- Tokens signed by unknown keys
+- Tokens missing required scope
+- Expired tokens
+- Tokens with incorrect audience
+
