@@ -1,0 +1,23 @@
+# Terraform
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/crash.log
+**/crash.*.log
+
+# If you choose to keep lockfiles out of repo; alternatively COMMIT lockfiles.
+.terraform.lock.hcl
+
+# Local tfvars
+**/terraform.tfvars
+**/*.auto.tfvars
+
+# Secrets / keys
+.env
+*.pem
+*.key
+*.p12
+*.pfx
+
+# AWS creds (never commit)
+.aws/
