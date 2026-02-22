@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: brownrook-idc
+  namespace: idc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: brownrook-idc
+  template:
+    metadata:
+      labels:
+        app: brownrook-idc
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/larocquemb/brownrook-idc:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: brownrook-idc-env
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            

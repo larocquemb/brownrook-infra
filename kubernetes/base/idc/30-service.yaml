@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: brownrook-idc
+  namespace: idc
+spec:
+  selector:
+    app: brownrook-idc
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      
