@@ -128,4 +128,23 @@ The system does not trust:
 - Expired tokens
 - Tokens with incorrect audience
 
->>>>>>> c2271feaa12c0a7e367634b3c50e84bb8c58af54
+---
+
+# Phase 1 Scope
+
+## Included
+
+- Minimal IDC API service
+- JWT validation middleware
+- Public `/health` endpoint
+- Secured `/secure` endpoint
+- Reverse proxy front-end (nginx)
+- Structured architecture and security documentation
+
+## Excluded (Phase 2)
+
+- mTLS between services
+- Private CA integration
+- Automated certificate rotation
+- Multi-tenant identity
+- Fine-grained RBAC
