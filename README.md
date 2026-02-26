@@ -118,7 +118,7 @@ AudienceMatch ∧
 NotExpired ∧
 ScopeSatisfied
 
-Trust Anchor:  
+Trust Anchor:   
 - Microsoft Entra ID Tenant (tid: 8b07f4bd-41e4-4106-8d49-00c5d79d35a2)
 
 The system does not trust:
