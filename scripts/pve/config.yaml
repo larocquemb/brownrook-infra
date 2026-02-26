@@ -1,6 +1,14 @@
-write-kubeconfig-mode: "644"
-node-name: k3s1
-
 disable:
   - traefik
   - servicelb
+
+secrets-encryption: true
+
+cluster-cidr: "10.42.0.0/16"
+service-cidr: "10.43.0.0/16"
+
+flannel-backend: "vxlan"
+
+tls-san:
+  - "k3s1.brownrook.net"
+  - "192.168.2.230"
