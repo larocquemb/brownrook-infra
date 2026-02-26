@@ -1,0 +1,6 @@
+write-kubeconfig-mode: "644"
+node-name: k3s1
+
+disable:
+  - traefik
+  - servicelb
