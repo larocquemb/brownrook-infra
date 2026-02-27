@@ -21,3 +21,6 @@
 
 # AWS creds (never commit)
 .aws/
+
+# Local Kubernetes secrets
+kubernetes/helm/idc/*.secret.yaml
