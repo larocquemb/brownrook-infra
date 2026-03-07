@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: idc-brownrook-com-tls
+  namespace: brownrook-idc
+spec:
+  secretName: idc-brownrook-com-tls
+  issuerRef:
+    name: letsencrypt-staging-route53
+    kind: ClusterIssuer
+  dnsNames:
+  - idc.brownrook.com
