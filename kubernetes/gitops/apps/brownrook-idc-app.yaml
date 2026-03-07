@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: brownrook-idc
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/larocquemb/brownrook-infra.git
+    targetRevision: main
+    path: kubernetes/platform/idc
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: brownrook-idc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
