@@ -6,7 +6,7 @@ metadata:
   labels:
     app: brownrook-idc
 spec:
-  replicas: 1
+  replicas: 2
   revisionHistoryLimit: 3
   strategy:
     type: RollingUpdate
@@ -48,7 +48,7 @@ spec:
               path: /health
               port: 8080
             initialDelaySeconds: 5
-            periodSeconds: 10
+            periodSeconds: 5
             timeoutSeconds: 2
           livenessProbe:
             httpGet:
