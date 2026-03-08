@@ -32,7 +32,7 @@ spec:
             preStop:
               exec:
                 command: ["/bin/sh", "-c", "sleep 15"]
-          image: ghcr.io/larocquemb/brownrook-idc:704f62bc0e2e5f8e54707c9a6c32e7c6978aa92d
+          image: ghcr.io/larocquemb/brownrook-idc:89d5e25c6853eaf91f7112ab6e162367ad00346a
           imagePullPolicy: Always
           ports:
             - name: http
