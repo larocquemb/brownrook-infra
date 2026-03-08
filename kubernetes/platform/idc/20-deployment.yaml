@@ -29,6 +29,11 @@ spec:
         - name: brownrook-idc
           image: ghcr.io/larocquemb/brownrook-idc:733cd304a6b53c55e64605153fc4d6d5578eb29f
           imagePullPolicy: Always
+          env:
+            - name: IMAGE_REF
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.containers[0].image
           ports:
             - name: http
               containerPort: 8080
