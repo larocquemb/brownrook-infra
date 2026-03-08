@@ -32,17 +32,17 @@ spec:
             preStop:
               exec:
                 command: ["/bin/sh", "-c", "sleep 15"]
-          image: ghcr.io/larocquemb/brownrook-idc:59cdb82c29206e6c1199c131b516e7505b0aad81
+          image: ghcr.io/larocquemb/brownrook-idc:395f0bc9c50aff4881bedf8a952e07242f93f855
           imagePullPolicy: Always
           env:
             - name: APP_VERSION
               value: "0.1.0"
             - name: GIT_COMMIT
-              value: "unknown"
+              value: "395f0bc9c50aff4881bedf8a952e07242f93f855"
             - name: BUILD_NUMBER
-              value: "00"
+              value: "21"
             - name: IMAGE_REF
-              value: "ghcr.io/larocquemb/brownrook-idc:unknown"  
+              value: "ghcr.io/larocquemb/brownrook-idc:395f0bc9c50aff4881bedf8a952e07242f93f855"
           ports:
             - name: http
               containerPort: 8080
