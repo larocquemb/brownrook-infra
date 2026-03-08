@@ -43,8 +43,6 @@ spec:
               value: "00"
             - name: IMAGE_REF
               value: "ghcr.io/larocquemb/brownrook-idc:unknown"  
-            - name: POD_NAME
-              value: "unknown"
           ports:
             - name: http
               containerPort: 8080
