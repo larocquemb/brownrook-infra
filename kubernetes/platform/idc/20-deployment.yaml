@@ -34,6 +34,17 @@ spec:
                 command: ["/bin/sh", "-c", "sleep 15"]
           image: ghcr.io/larocquemb/brownrook-idc:89d5e25c6853eaf91f7112ab6e162367ad00346a
           imagePullPolicy: Always
+          env:
+            - name: APP_VERSION
+              value: "0.1.0"
+            - name: GIT_COMMIT
+              value: "unknown"
+            - name: BUILD_NUMBER
+              value: "00"
+            - name: IMAGE_REF
+              value: "ghcr.io/larocquemb/brownrook-idc:unknown"  
+            - name: POD_NAME
+              value: "unknown"
           ports:
             - name: http
               containerPort: 8080
