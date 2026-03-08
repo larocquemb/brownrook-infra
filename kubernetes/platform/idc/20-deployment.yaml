@@ -27,7 +27,7 @@ spec:
         runAsNonRoot: true
       containers:
         - name: brownrook-idc
-          image: ghcr.io/larocquemb/brownrook-idc:24303594bcb4039c87c2e5f4f3dd64ca34022318
+          image: ghcr.io/larocquemb/brownrook-idc:8b4e004e6c530c251889ad77d8e47c7a467b71c4
           imagePullPolicy: Always
           ports:
             - name: http
