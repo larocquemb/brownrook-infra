@@ -21,7 +21,7 @@ spec:
       labels:
         app: brownrook-idc
     spec:
-      terminationGracePeriodSeconds: 30    
+      terminationGracePeriodSeconds: 45    
       imagePullSecrets:
         - name: ghcr-secret
       securityContext:
@@ -31,7 +31,7 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-c", "sleep 10"]
+                command: ["/bin/sh", "-c", "sleep 15"]
           image: ghcr.io/larocquemb/brownrook-idc:8b4e004e6c530c251889ad77d8e47c7a467b71c4
           imagePullPolicy: Always
           ports:
