@@ -40,7 +40,7 @@ spec:
             - name: GIT_COMMIT
               value: "8cae499f42a1702a7eee3abcc5a46c85444c6f72"
             - name: IMAGE_COMMIT
-              value: "5b51ffd5edf5b07cf31bf842c4c85954769f4ab1"
+              value: "unknown"
             - name: BUILD_NUMBER
               value: "25"
             - name: DEPLOYMENT_PROFILE
