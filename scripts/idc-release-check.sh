@@ -15,6 +15,11 @@ need_cmd() {
   }
 }
 
+short() {
+  local v="${1:-unknown}"
+  [[ "$v" == "unknown" || -z "$v" ]] && echo "unknown" || echo "${v:0:7}"
+}
+
 need_cmd git
 need_cmd kubectl
 need_cmd jq
@@ -32,29 +37,28 @@ CLUSTER_IMAGE="$(kubectl get deployment "$APP" -n "$NS" -o jsonpath='{.spec.temp
 CLUSTER_COMMIT="${CLUSTER_IMAGE##*:}"
 
 echo "APP"
-echo "  local commit:   $LOCAL_COMMIT"
-echo "  remote commit:  ${REMOTE_COMMIT:-unknown}"
-echo "  cluster image:  $CLUSTER_IMAGE"
-echo "  cluster commit: $CLUSTER_COMMIT"
+printf "  %-8s %s\n" "local"   "$(short "$LOCAL_COMMIT")"
+printf "  %-8s %s\n" "remote"  "$(short "${REMOTE_COMMIT:-unknown}")"
+printf "  %-8s %s\n" "cluster" "$(short "$CLUSTER_COMMIT")"
 echo
 
 echo "REGISTRY"
 if [[ -n "${REMOTE_COMMIT:-}" ]] && skopeo inspect "docker://${IMAGE}:${REMOTE_COMMIT}" >/dev/null 2>&1; then
-  echo "  ghcr image:     present for remote main"
+  printf "  %-8s %s\n" "ghcr" "present"
 else
-  echo "  ghcr image:     missing for remote main"
+  printf "  %-8s %s\n" "ghcr" "missing"
 fi
 echo
 
 echo "GITOPS"
-echo "  argo revision:  $INFRA_COMMIT"
+printf "  %-8s %s\n" "argo" "$(short "$INFRA_COMMIT")"
 echo
 
 echo "ROLLOUT"
 if kubectl rollout status deployment/"$APP" -n "$NS" --timeout=1s >/dev/null 2>&1; then
-  echo "  status:         complete"
+  printf "  %-8s %s\n" "status" "complete"
 else
-  echo "  status:         progressing or unavailable"
+  printf "  %-8s %s\n" "status" "progressing"
 fi
 echo
 
@@ -63,11 +67,13 @@ kubectl get pods -n "$NS" \
   -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.containerStatuses[0].ready}{"\t"}{.status.containerStatuses[0].restartCount}{"\t"}{.metadata.creationTimestamp}{"\t"}{.spec.nodeName}{"\t"}{.spec.containers[0].image}{"\n"}{end}' \
 | awk -F'\t' '
 BEGIN {
-  printf "%-38s %-7s %-9s %-22s %-12s %s\n", "POD", "READY", "RESTARTS", "CREATED", "NODE", "IMAGE_SHA"
+  printf "%-34s %-5s %-4s %-20s %-10s %s\n", "POD", "RDY", "RST", "CREATED", "NODE", "SHA"
 }
 {
   n=split($6,a,":")
-  printf "%-38s %-7s %-9s %-22s %-12s %s\n", $1, $2, $3, $4, $5, a[n]
+  sha=a[n]
+  if (length(sha) > 7) sha=substr(sha,1,7)
+  printf "%-34s %-5s %-4s %-20s %-10s %s\n", $1, $2, $3, $4, $5, sha
 }'
 echo
 

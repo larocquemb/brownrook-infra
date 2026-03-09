@@ -7,23 +7,40 @@ APP="brownrook-idc"
 
 to_utc() {
   local ts="${1:-}"
-  if [[ -z "$ts" || "$ts" == "unknown" || "$ts" == "null" ]]; then
-    echo "unknown"
-    return
-  fi
+  python3 - "$ts" <<'PY'
+import sys
+from datetime import datetime, timezone
 
-  date -u -j -f "%Y-%m-%dT%H:%M:%S%z" "$(echo "$ts" | sed 's/Z/+0000/')" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null \
-    || echo "$ts"
+ts = sys.argv[1]
+if not ts or ts in {"unknown", "null"}:
+    print("unknown")
+    raise SystemExit(0)
+
+try:
+    dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    print(dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+except Exception:
+    print(ts)
+PY
 }
 
 epoch_utc() {
   local ts="${1:-}"
-  if [[ -z "$ts" || "$ts" == "unknown" || "$ts" == "null" ]]; then
-    echo ""
-    return
-  fi
+  python3 - "$ts" <<'PY'
+import sys
+from datetime import datetime, timezone
 
-  date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" "+%s" 2>/dev/null || echo ""
+ts = sys.argv[1]
+if not ts or ts in {"unknown", "null"}:
+    print("")
+    raise SystemExit(0)
+
+try:
+    dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    print(int(dt.astimezone(timezone.utc).timestamp()))
+except Exception:
+    print("")
+PY
 }
 
 delta() {
@@ -49,27 +66,20 @@ git -C "$IDC_REPO" fetch origin --prune >/dev/null 2>&1
 git -C "$INFRA_REPO" fetch origin --prune >/dev/null 2>&1
 
 APP_COMMIT="$(git -C "$IDC_REPO" rev-parse HEAD)"
-APP_TIME_RAW="$(git -C "$IDC_REPO" show -s --format='%cI' HEAD)"
-APP_TIME="$(to_utc "$APP_TIME_RAW")"
+APP_TIME="$(to_utc "$(git -C "$IDC_REPO" show -s --format='%cI' HEAD)")"
 REMOTE_APP_COMMIT="$(git -C "$IDC_REPO" rev-parse origin/main)"
-REMOTE_APP_TIME_RAW="$(git -C "$IDC_REPO" show -s --format='%cI' origin/main)"
-REMOTE_APP_TIME="$(to_utc "$REMOTE_APP_TIME_RAW")"
+REMOTE_APP_TIME="$(to_utc "$(git -C "$IDC_REPO" show -s --format='%cI' origin/main)")"
 
 LOCAL_INFRA_COMMIT="$(git -C "$INFRA_REPO" rev-parse HEAD)"
-LOCAL_INFRA_TIME_RAW="$(git -C "$INFRA_REPO" show -s --format='%cI' HEAD)"
-LOCAL_INFRA_TIME="$(to_utc "$LOCAL_INFRA_TIME_RAW")"
+LOCAL_INFRA_TIME="$(to_utc "$(git -C "$INFRA_REPO" show -s --format='%cI' HEAD)")"
 REMOTE_INFRA_COMMIT="$(git -C "$INFRA_REPO" rev-parse origin/main)"
-REMOTE_INFRA_TIME_RAW="$(git -C "$INFRA_REPO" show -s --format='%cI' origin/main)"
-REMOTE_INFRA_TIME="$(to_utc "$REMOTE_INFRA_TIME_RAW")"
+REMOTE_INFRA_TIME="$(to_utc "$(git -C "$INFRA_REPO" show -s --format='%cI' origin/main)")"
 
 ARGO_JSON="$(kubectl get application "$APP" -n argocd -o json)"
 ARGO_REV="$(jq -r '.status.sync.revision' <<<"$ARGO_JSON")"
-ARGO_START_RAW="$(jq -r '.status.operationState.startedAt // "unknown"' <<<"$ARGO_JSON")"
-ARGO_FINISH_RAW="$(jq -r '.status.operationState.finishedAt // "unknown"' <<<"$ARGO_JSON")"
-ARGO_HEALTH_RAW="$(jq -r '.status.health.lastTransitionTime // "unknown"' <<<"$ARGO_JSON")"
-ARGO_START="$(to_utc "$ARGO_START_RAW")"
-ARGO_FINISH="$(to_utc "$ARGO_FINISH_RAW")"
-ARGO_HEALTH="$(to_utc "$ARGO_HEALTH_RAW")"
+ARGO_START="$(to_utc "$(jq -r '.status.operationState.startedAt // "unknown"' <<<"$ARGO_JSON")")"
+ARGO_FINISH="$(to_utc "$(jq -r '.status.operationState.finishedAt // "unknown"' <<<"$ARGO_JSON")")"
+ARGO_HEALTH="$(to_utc "$(jq -r '.status.health.lastTransitionTime // "unknown"' <<<"$ARGO_JSON")")"
 
 VERSION_JSON="$(curl -fsS https://idc.brownrook.com/version)"
 PUBLIC_COMMIT="$(jq -r '.commit' <<<"$VERSION_JSON")"
