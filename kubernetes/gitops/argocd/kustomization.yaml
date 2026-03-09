@@ -4,6 +4,7 @@ resources:
   - namespace.yaml
   - argocd-cm.yaml  
   - argocd-cmd-params-cm.yaml  
+  - repo-brownrook-infra.yaml
   - ingress.yaml
   - certificate.yaml
 
