@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: brownrook
+  namespace: argocd
+spec:
+
+  description: BrownRook platform applications
+
+  sourceRepos:
+  - https://github.com/larocquemb/brownrook-infra.git
+  - https://github.com/larocquemb/brownrook-idc.git
+
+  destinations:
+  - namespace: brownrook-idc
+    server: https://kubernetes.default.svc
+  - namespace: argocd
+    server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+
+  namespaceResourceWhitelist:
+  - group: '*'
+    kind: '*'
+    

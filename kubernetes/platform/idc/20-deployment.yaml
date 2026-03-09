@@ -5,6 +5,10 @@ metadata:
   namespace: brownrook-idc
   labels:
     app: brownrook-idc
+  annotations:
+    brownrook.com/app-version: "0.1.18"
+    brownrook.com/git-commit: "4c1003587986e9a1d2a5f105e08dffbd270b0bf1"
+    brownrook.com/build-number: "43"    
 spec:
   replicas: 2
   revisionHistoryLimit: 3
@@ -20,6 +24,10 @@ spec:
     metadata:
       labels:
         app: brownrook-idc
+      annotations:
+        brownrook.com/app-version: "0.1.18"
+        brownrook.com/git-commit: "4c1003587986e9a1d2a5f105e08dffbd270b0bf1"
+        brownrook.com/build-number: "43"        
     spec:
       terminationGracePeriodSeconds: 45    
       imagePullSecrets:
