@@ -42,7 +42,7 @@ spec:
             - name: BUILD_NUMBER
               value: "43"
             - name: DEPLOYMENT_PROFILE
-              value: "demo"
+              value: "sandbox"
             - name: IMAGE_REF
               value: "ghcr.io/larocquemb/brownrook-idc:4c1003587986e9a1d2a5f105e08dffbd270b0bf1"
             - name: CLUSTER_NAME
