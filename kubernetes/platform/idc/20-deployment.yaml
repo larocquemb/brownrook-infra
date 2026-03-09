@@ -39,6 +39,8 @@ spec:
               value: "0.1.2"
             - name: GIT_COMMIT
               value: "5b51ffd5edf5b07cf31bf842c4c85954769f4ab1"
+            - name: IMAGE_COMMIT
+              value: "5b51ffd5edf5b07cf31bf842c4c85954769f4ab1"
             - name: BUILD_NUMBER
               value: "24"
             - name: DEPLOYMENT_PROFILE
