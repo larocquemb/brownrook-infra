@@ -1,58 +1,66 @@
 #!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
-IDC_REPO=~/Developer/brownrook/brownrook-idc
-APP=brownrook-idc
-NS=brownrook-idc
-IMAGE=ghcr.io/larocquemb/brownrook-idc
+IDC_REPO="${IDC_REPO:-$HOME/Developer/brownrook/brownrook-idc}"
+APP="brownrook-idc"
+NS="brownrook-idc"
+IMAGE="ghcr.io/larocquemb/brownrook-idc"
+INFO_URL="https://idc.brownrook.com/info"
 
-echo "======================================"
-echo "BrownRook IDC Release Verification"
-echo "======================================"
+need_cmd() {
+  command -v "$1" >/dev/null 2>&1 || {
+    echo "Missing required command: $1" >&2
+    exit 1
+  }
+}
+
+need_cmd git
+need_cmd kubectl
+need_cmd jq
+need_cmd curl
+need_cmd skopeo
+
+echo "BrownRook IDC Live Dashboard"
+echo "Updated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 echo
 
-echo "1️⃣ Local source commit"
-LOCAL_COMMIT=$(git -C $IDC_REPO rev-parse HEAD)
-echo "   $LOCAL_COMMIT"
+LOCAL_COMMIT="$(git -C "$IDC_REPO" rev-parse HEAD 2>/dev/null || echo unknown)"
+REMOTE_COMMIT="$(git -C "$IDC_REPO" ls-remote origin main 2>/dev/null | awk '{print $1}')"
+INFRA_COMMIT="$(kubectl get application "$APP" -n argocd -o json 2>/dev/null | jq -r '.status.sync.revision // "unknown"')"
+CLUSTER_IMAGE="$(kubectl get deployment "$APP" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo unknown)"
+CLUSTER_COMMIT="${CLUSTER_IMAGE##*:}"
+
+echo "APP"
+echo "  local commit:   $LOCAL_COMMIT"
+echo "  remote commit:  ${REMOTE_COMMIT:-unknown}"
+echo "  cluster image:  $CLUSTER_IMAGE"
+echo "  cluster commit: $CLUSTER_COMMIT"
 echo
 
-echo "2️⃣ GHCR image check"
-if podman manifest inspect ${IMAGE}:${LOCAL_COMMIT} >/dev/null 2>&1; then
-    echo "   ✔ image exists in GHCR"
+echo "REGISTRY"
+if [[ -n "${REMOTE_COMMIT:-}" ]] && skopeo inspect "docker://${IMAGE}:${REMOTE_COMMIT}" >/dev/null 2>&1; then
+  echo "  ghcr image:     present for remote main"
 else
-    echo "   ❌ image NOT found in GHCR"
+  echo "  ghcr image:     missing for remote main"
 fi
 echo
 
-echo "3️⃣ ArgoCD deployed infra commit"
-INFRA_COMMIT=$(kubectl get application $APP -n argocd -o json | jq -r '.status.sync.revision')
-echo "   $INFRA_COMMIT"
+echo "GITOPS"
+echo "  argo revision:  $INFRA_COMMIT"
 echo
 
-echo "4️⃣ Kubernetes deployment image"
-CLUSTER_IMAGE=$(kubectl get deployment $APP -n $NS -o jsonpath='{.spec.template.spec.containers[0].image}')
-echo "   $CLUSTER_IMAGE"
-echo
-
-CLUSTER_COMMIT=$(echo $CLUSTER_IMAGE | cut -d: -f2)
-
-echo "5️⃣ Commit comparison"
-echo "   local commit:   $LOCAL_COMMIT"
-echo "   cluster commit: $CLUSTER_COMMIT"
-
-if [[ "$LOCAL_COMMIT" == "$CLUSTER_COMMIT" ]]; then
-    echo "   ✔ cluster is running latest commit"
+echo "ROLLOUT"
+if kubectl rollout status deployment/"$APP" -n "$NS" --timeout=1s >/dev/null 2>&1; then
+  echo "  status:         complete"
 else
-    echo "   ⚠ cluster not running latest commit"
+  echo "  status:         progressing or unavailable"
 fi
 echo
 
-echo "6️⃣ Runtime API info"
-curl -s https://idc.brownrook.com/info | jq
+echo "PODS"
+kubectl get pods -n "$NS"
 echo
 
-echo "======================================"
-echo "Verification complete"
-echo "======================================"
-
+echo "API /info"
+curl -fsS "$INFO_URL" 2>/dev/null | jq || echo "unavailable"
