@@ -59,7 +59,16 @@ fi
 echo
 
 echo "PODS"
-kubectl get pods -n "$NS"
+kubectl get pods -n "$NS" \
+  -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.containerStatuses[0].ready}{"\t"}{.status.containerStatuses[0].restartCount}{"\t"}{.metadata.creationTimestamp}{"\t"}{.spec.nodeName}{"\t"}{.spec.containers[0].image}{"\n"}{end}' \
+| awk -F'\t' '
+BEGIN {
+  printf "%-38s %-7s %-9s %-22s %-12s %s\n", "POD", "READY", "RESTARTS", "CREATED", "NODE", "IMAGE_SHA"
+}
+{
+  n=split($6,a,":")
+  printf "%-38s %-7s %-9s %-22s %-12s %s\n", $1, $2, $3, $4, $5, a[n]
+}'
 echo
 
 echo "API /info"
