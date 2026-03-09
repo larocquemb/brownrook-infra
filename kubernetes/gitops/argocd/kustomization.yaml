@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - argocd-cm.yaml  
+  - argocd-cmd-params-cm.yaml  
   - ingress.yaml
   - certificate.yaml
 
