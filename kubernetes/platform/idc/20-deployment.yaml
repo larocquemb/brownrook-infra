@@ -7,8 +7,8 @@ metadata:
     app: brownrook-idc
   annotations:
     brownrook.com/app-version: "0.1.18"
-    brownrook.com/git-commit: "4c1003587986e9a1d2a5f105e08dffbd270b0bf1"
-    brownrook.com/build-number: "43"    
+    brownrook.com/git-commit: "5f8df4ebfd6e76505f749425e78f46a48b4baf27"
+    brownrook.com/build-number: "46"
 spec:
   replicas: 2
   revisionHistoryLimit: 3
@@ -26,8 +26,8 @@ spec:
         app: brownrook-idc
       annotations:
         brownrook.com/app-version: "0.1.18"
-        brownrook.com/git-commit: "4c1003587986e9a1d2a5f105e08dffbd270b0bf1"
-        brownrook.com/build-number: "43"        
+        brownrook.com/git-commit: "5f8df4ebfd6e76505f749425e78f46a48b4baf27"
+        brownrook.com/build-number: "46"
     spec:
       terminationGracePeriodSeconds: 45    
       imagePullSecrets:
@@ -40,19 +40,19 @@ spec:
             preStop:
               exec:
                 command: ["/bin/sh", "-c", "sleep 15"]
-          image: ghcr.io/larocquemb/brownrook-idc:7804917e48454399e2db828dae7a0abb80f6e015
+          image: ghcr.io/larocquemb/brownrook-idc:5f8df4ebfd6e76505f749425e78f46a48b4baf27
           imagePullPolicy: Always
           env:
             - name: APP_VERSION
               value: "0.1.18"
             - name: GIT_COMMIT
-              value: "7804917e48454399e2db828dae7a0abb80f6e015"
+              value: "5f8df4ebfd6e76505f749425e78f46a48b4baf27"
             - name: BUILD_NUMBER
-              value: "45"
+              value: "46"
             - name: DEPLOYMENT_PROFILE
               value: "sandbox"
             - name: IMAGE_REF
-              value: "ghcr.io/larocquemb/brownrook-idc:7804917e48454399e2db828dae7a0abb80f6e015"
+              value: "ghcr.io/larocquemb/brownrook-idc:5f8df4ebfd6e76505f749425e78f46a48b4baf27"
             - name: CLUSTER_NAME
               value: "k3s1"
             - name: KUBERNETES_VERSION
