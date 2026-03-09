@@ -32,19 +32,19 @@ spec:
             preStop:
               exec:
                 command: ["/bin/sh", "-c", "sleep 15"]
-          image: ghcr.io/larocquemb/brownrook-idc:b5e9734b01114f7193a0858e8f39b8b999edf5a0
+          image: ghcr.io/larocquemb/brownrook-idc:fa57f493bffc08d473b6a8d29c90ddf3a287317b
           imagePullPolicy: Always
           env:
             - name: APP_VERSION
-              value: "0.1.14"
+              value: "0.1.15"
             - name: GIT_COMMIT
-              value: "b5e9734b01114f7193a0858e8f39b8b999edf5a0"
+              value: "fa57f493bffc08d473b6a8d29c90ddf3a287317b"
             - name: BUILD_NUMBER
-              value: "39"
+              value: "40"
             - name: DEPLOYMENT_PROFILE
               value: "demo"
             - name: IMAGE_REF
-              value: "ghcr.io/larocquemb/brownrook-idc:b5e9734b01114f7193a0858e8f39b8b999edf5a0"
+              value: "ghcr.io/larocquemb/brownrook-idc:fa57f493bffc08d473b6a8d29c90ddf3a287317b"
             - name: CLUSTER_NAME
               value: "k3s1"
             - name: KUBERNETES_VERSION
