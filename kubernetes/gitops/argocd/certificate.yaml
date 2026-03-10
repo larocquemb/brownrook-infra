@@ -1,13 +1,12 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: argocd-brownrook-com-tls
+  name: argocd-idc-brownrook-com-tls
   namespace: argocd
 spec:
-  secretName: argocd-brownrook-com-tls
+  secretName: argocd-idc-brownrook-com-tls
   issuerRef:
     name: letsencrypt-prod-route53
     kind: ClusterIssuer
   dnsNames:
-    - argocd.brownrook.com
-
+    - argocd.idc.brownrook.com

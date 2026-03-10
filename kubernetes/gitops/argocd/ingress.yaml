@@ -1,19 +1,20 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: argocd-server
+  name: argocd-server-public-http
   namespace: argocd
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.priority: "10"
 spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - argocd.brownrook.com
-      secretName: argocd-brownrook-com-tls
+        - argocd.idc.brownrook.com
+      secretName: argocd-idc-brownrook-com-tls
   rules:
-    - host: argocd.brownrook.com
+    - host: argocd.idc.brownrook.com
       http:
         paths:
           - path: /
@@ -23,4 +24,88 @@ spec:
                 name: argocd-server
                 port:
                   number: 80
-
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server-public-grpc
+  namespace: argocd
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.priority: "11"
+    traefik.ingress.kubernetes.io/router.rule: Host(`argocd.idc.brownrook.com`) && Header(`Content-Type`,`application/grpc`)
+    traefik.ingress.kubernetes.io/service.serversscheme: h2c
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - argocd.idc.brownrook.com
+      secretName: argocd-idc-brownrook-com-tls
+  rules:
+    - host: argocd.idc.brownrook.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server-internal-http
+  namespace: argocd
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.priority: "10"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - argocd.brownrook.net
+      secretName: argocd-server-tls
+  rules:
+    - host: argocd.brownrook.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server-internal-grpc
+  namespace: argocd
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.priority: "11"
+    traefik.ingress.kubernetes.io/router.rule: Host(`argocd.brownrook.net`) && Header(`Content-Type`,`application/grpc`)
+    traefik.ingress.kubernetes.io/service.serversscheme: h2c
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - argocd.brownrook.net
+      secretName: argocd-server-tls
+  rules:
+    - host: argocd.brownrook.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80
