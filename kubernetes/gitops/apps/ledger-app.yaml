@@ -7,7 +7,7 @@ spec:
   project: brownrook
   source:
     repoURL: https://github.com/larocquemb/home-budget-pipeline.git
-    targetRevision: KAN-68
+    targetRevision: main
     path: k8s
   destination:
     server: https://kubernetes.default.svc
