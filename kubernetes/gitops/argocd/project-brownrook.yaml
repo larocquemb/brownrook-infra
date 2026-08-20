@@ -10,9 +10,12 @@ spec:
   sourceRepos:
   - https://github.com/larocquemb/brownrook-infra.git
   - https://github.com/larocquemb/brownrook-idc.git
+  - https://github.com/larocquemb/home-budget-pipeline.git
 
   destinations:
   - namespace: brownrook-idc
+    server: https://kubernetes.default.svc
+  - namespace: home-budget
     server: https://kubernetes.default.svc
   - namespace: argocd
     server: https://kubernetes.default.svc
@@ -24,4 +27,3 @@ spec:
   namespaceResourceWhitelist:
   - group: '*'
     kind: '*'
-    
