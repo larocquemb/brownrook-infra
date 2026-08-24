@@ -4,3 +4,4 @@ resources:
   - argocd
   - apps/brownrook-idc-app.yaml
   - apps/ledger-app.yaml
+  - apps/traefik-app.yaml
