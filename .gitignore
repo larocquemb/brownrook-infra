@@ -24,3 +24,6 @@
 
 # Local Kubernetes secrets
 kubernetes/helm/idc/*.secret.yaml
+
+.DS_Store
+**/.DS_Store
