@@ -68,7 +68,7 @@ spec:
   tls:
     - hosts:
         - argocd.brownrook.net
-      secretName: argocd-server-tls
+      secretName: k3ingress-tls
   rules:
     - host: argocd.brownrook.net
       http:
@@ -97,7 +97,7 @@ spec:
   tls:
     - hosts:
         - argocd.brownrook.net
-      secretName: argocd-server-tls
+      secretName: k3ingress-tls
   rules:
     - host: argocd.brownrook.net
       http:
