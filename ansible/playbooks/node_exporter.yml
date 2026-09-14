@@ -1,0 +1,7 @@
+---
+- name: Configure node_exporter on K3s nodes
+  hosts: k3s_nodes
+  become: true
+  gather_facts: true
+  roles:
+    - role: node_exporter

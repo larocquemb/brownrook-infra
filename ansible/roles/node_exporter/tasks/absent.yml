@@ -1,0 +1,64 @@
+---
+- name: Check whether the node_exporter service exists
+  ansible.builtin.stat:
+    path: /etc/systemd/system/node_exporter.service
+  register: node_exporter_service_file
+
+- name: Stop and disable node_exporter
+  ansible.builtin.systemd_service:
+    name: node_exporter.service
+    enabled: false
+    state: stopped
+  when: node_exporter_service_file.stat.exists
+
+- name: Check whether the node_exporter firewall service exists
+  ansible.builtin.stat:
+    path: /etc/systemd/system/brownrook-node-exporter-firewall.service
+  register: node_exporter_firewall_service_file
+
+- name: Stop and disable the node_exporter firewall
+  ansible.builtin.systemd_service:
+    name: brownrook-node-exporter-firewall.service
+    enabled: false
+    state: stopped
+  when: node_exporter_firewall_service_file.stat.exists
+
+- name: Check for a residual node_exporter nftables table
+  ansible.builtin.command:
+    cmd: "/usr/sbin/nft list table inet {{ node_exporter_nft_table }}"
+  register: node_exporter_nft_table_status
+  changed_when: false
+  failed_when: false
+
+- name: Remove a residual node_exporter nftables table
+  ansible.builtin.command:
+    cmd: "/usr/sbin/nft delete table inet {{ node_exporter_nft_table }}"
+  when: node_exporter_nft_table_status.rc == 0
+  changed_when: true
+
+- name: Remove node_exporter managed files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/node_exporter.service
+    - /etc/systemd/system/brownrook-node-exporter-firewall.service
+    - /etc/nftables/brownrook-node-exporter.nft
+    - "{{ node_exporter_binary_path }}"
+    - "{{ node_exporter_install_root }}"
+    - "{{ node_exporter_cache_dir }}"
+  notify: Reload systemd
+
+- name: Remove the node_exporter service account
+  ansible.builtin.user:
+    name: "{{ node_exporter_user }}"
+    state: absent
+    remove: false
+
+- name: Remove the node_exporter group
+  ansible.builtin.group:
+    name: "{{ node_exporter_group }}"
+    state: absent
+
+- name: Apply systemd changes after removal
+  ansible.builtin.meta: flush_handlers

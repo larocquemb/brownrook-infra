@@ -1,0 +1,78 @@
+---
+- name: Verify monitoring host prerequisites
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ monitoring_server_promtool_path }}"
+    - /usr/bin/python3
+    - /etc/grafana/provisioning/dashboards
+  register: monitoring_server_prerequisites
+
+- name: Require installed Prometheus and Grafana packages
+  ansible.builtin.assert:
+    that:
+      - monitoring_server_prerequisites.results | map(attribute='stat.exists') | min
+    fail_msg: "Install the Prometheus and Grafana packages before running this role."
+
+- name: Create the Git-managed Grafana dashboard directory
+  ansible.builtin.file:
+    path: "{{ monitoring_server_grafana_dashboard_dir }}"
+    state: directory
+    owner: root
+    group: "{{ monitoring_server_grafana_group }}"
+    mode: "0750"
+
+- name: Install the validated Prometheus configuration
+  ansible.builtin.copy:
+    src: "{{ monitoring_server_source_root }}/prometheus/prometheus.yml"
+    dest: "{{ monitoring_server_prometheus_config_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+    validate: "{{ monitoring_server_promtool_path }} check config %s"
+  notify: Reload Prometheus
+
+- name: Install the Grafana dashboard provider
+  ansible.builtin.copy:
+    src: "{{ monitoring_server_source_root }}/grafana/provisioning/dashboards/brownrook-k3s.yaml"
+    dest: "{{ monitoring_server_grafana_provider_path }}"
+    owner: root
+    group: "{{ monitoring_server_grafana_group }}"
+    mode: "0640"
+  notify: Restart Grafana
+
+- name: Install the K3s Node Grafana dashboard
+  ansible.builtin.copy:
+    src: "{{ monitoring_server_source_root }}/grafana/dashboards/k3s-node.json"
+    dest: "{{ monitoring_server_grafana_dashboard_path }}"
+    owner: root
+    group: "{{ monitoring_server_grafana_group }}"
+    mode: "0640"
+    validate: /usr/bin/python3 -m json.tool %s
+  notify: Restart Grafana
+
+- name: Apply monitoring configuration changes before verification
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify node_exporter from the monitoring host
+  ansible.builtin.uri:
+    url: "http://{{ monitoring_server_node_exporter_target }}/metrics"
+    return_content: true
+    status_code: 200
+  register: monitoring_server_exporter_metrics
+  retries: 5
+  delay: 2
+  until: "'node_uname_info' in monitoring_server_exporter_metrics.content"
+  changed_when: false
+
+- name: Verify Prometheus has ingested k3s1 node identity
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:9090/api/v1/query?query=node_uname_info"
+    return_content: true
+    status_code: 200
+  register: monitoring_server_prometheus_query
+  retries: 10
+  delay: 3
+  until: "monitoring_server_node_exporter_target in monitoring_server_prometheus_query.content"
+  changed_when: false

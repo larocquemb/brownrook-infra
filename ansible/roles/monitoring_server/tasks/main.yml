@@ -1,0 +1,14 @@
+---
+- name: Validate requested monitoring server state
+  ansible.builtin.assert:
+    that:
+      - monitoring_server_state in ['present', 'absent']
+    fail_msg: "monitoring_server_state must be present or absent"
+
+- name: Configure K3s node monitoring
+  ansible.builtin.include_tasks: present.yml
+  when: monitoring_server_state == 'present'
+
+- name: Remove K3s node monitoring
+  ansible.builtin.include_tasks: absent.yml
+  when: monitoring_server_state == 'absent'

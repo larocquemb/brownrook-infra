@@ -1,0 +1,6 @@
+---
+- name: Configure K3s node exporters
+  ansible.builtin.import_playbook: node_exporter.yml
+
+- name: Configure the monitoring server
+  ansible.builtin.import_playbook: monitoring_server.yml

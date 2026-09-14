@@ -1,0 +1,151 @@
+---
+- name: Validate the supported node_exporter platform and configuration
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['os_family'] == 'RedHat'
+      - ansible_facts['architecture'] == 'x86_64'
+      - node_exporter_arch == 'amd64'
+      - node_exporter_sha256 is match('^[0-9a-f]{64}$')
+      - node_exporter_allowed_source is match('^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$')
+    fail_msg: >-
+      This role supports x86_64 Red Hat-family hosts and requires a valid
+      SHA-256 digest and monitoring source IP.
+
+- name: Install node_exporter runtime dependencies
+  ansible.builtin.package:
+    name:
+      - nftables
+      - tar
+    state: present
+
+- name: Create the node_exporter group
+  ansible.builtin.group:
+    name: "{{ node_exporter_group }}"
+    system: true
+    state: present
+
+- name: Create the node_exporter service account
+  ansible.builtin.user:
+    name: "{{ node_exporter_user }}"
+    group: "{{ node_exporter_group }}"
+    comment: Prometheus Node Exporter
+    create_home: false
+    home: /nonexistent
+    shell: /usr/sbin/nologin
+    system: true
+    state: present
+
+- name: Create node_exporter directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ node_exporter_cache_dir }}"
+      mode: "0755"
+    - path: "{{ node_exporter_install_root }}/{{ node_exporter_version }}"
+      mode: "0755"
+    - path: /etc/nftables
+      mode: "0755"
+
+- name: Download the pinned node_exporter archive
+  ansible.builtin.get_url:
+    url: "{{ node_exporter_download_url }}"
+    dest: "{{ node_exporter_cache_dir }}/{{ node_exporter_archive_name }}"
+    checksum: "sha256:{{ node_exporter_sha256 }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Extract the pinned node_exporter binary
+  ansible.builtin.unarchive:
+    src: "{{ node_exporter_cache_dir }}/{{ node_exporter_archive_name }}"
+    dest: "{{ node_exporter_install_root }}/{{ node_exporter_version }}"
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+    creates: "{{ node_exporter_install_root }}/{{ node_exporter_version }}/node_exporter"
+    owner: root
+    group: root
+  notify: Restart node_exporter
+
+- name: Set node_exporter binary permissions
+  ansible.builtin.file:
+    path: "{{ node_exporter_install_root }}/{{ node_exporter_version }}/node_exporter"
+    state: file
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Point the stable path at the pinned node_exporter version
+  ansible.builtin.file:
+    src: "{{ node_exporter_install_root }}/{{ node_exporter_version }}/node_exporter"
+    dest: "{{ node_exporter_binary_path }}"
+    state: link
+    owner: root
+    group: root
+    force: true
+  notify: Restart node_exporter
+
+- name: Install the dedicated node_exporter nftables policy
+  ansible.builtin.template:
+    src: node-exporter.nft.j2
+    dest: /etc/nftables/brownrook-node-exporter.nft
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Restart node_exporter firewall
+    - Restart node_exporter
+
+- name: Install the node_exporter firewall service
+  ansible.builtin.template:
+    src: node-exporter-firewall.service.j2
+    dest: /etc/systemd/system/brownrook-node-exporter-firewall.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart node_exporter firewall
+    - Restart node_exporter
+
+- name: Install the hardened node_exporter service
+  ansible.builtin.template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart node_exporter
+
+- name: Enable and start the node_exporter firewall
+  ansible.builtin.systemd_service:
+    name: brownrook-node-exporter-firewall.service
+    daemon_reload: true
+    enabled: true
+    state: started
+
+- name: Enable and start node_exporter
+  ansible.builtin.systemd_service:
+    name: node_exporter.service
+    enabled: true
+    state: started
+
+- name: Apply pending service changes before verification
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify node_exporter locally
+  ansible.builtin.uri:
+    url: http://127.0.0.1:9100/metrics
+    return_content: true
+    status_code: 200
+  register: node_exporter_metrics
+  retries: 5
+  delay: 2
+  until: "'node_uname_info' in node_exporter_metrics.content"
+  changed_when: false

@@ -1,0 +1,89 @@
+---
+name: Validate monitoring infrastructure
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/validate-monitoring.yml"
+      - ".ansible-lint"
+      - "ansible.cfg"
+      - "ansible/**"
+      - "monitoring/**"
+      - "requirements-dev.txt"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/validate-monitoring.yml"
+      - ".ansible-lint"
+      - "ansible.cfg"
+      - "ansible/**"
+      - "monitoring/**"
+      - "requirements-dev.txt"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ANSIBLE_LOCAL_TEMP: /tmp/ansible-local
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install pinned validation tools
+        run: python -m pip install --requirement requirements-dev.txt
+
+      - name: Create the Ansible local temporary directory
+        run: mkdir -p "$ANSIBLE_LOCAL_TEMP"
+
+      - name: Lint Ansible content
+        run: ansible-lint ansible
+
+      - name: Check Ansible playbook syntax
+        run: |
+          ansible-playbook --syntax-check ansible/playbooks/site.yml
+          ansible-playbook --syntax-check ansible/playbooks/remove-node-monitoring.yml
+
+      - name: Install pinned promtool
+        env:
+          PROMETHEUS_VERSION: "2.53.3"
+          PROMETHEUS_SHA256: "ebe549477a699c464a0cef0d8d55c0cc9972a1b301fc910b5f260cfc3e08f6a3"
+        run: |
+          archive="prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz"
+          url="https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/${archive}"
+          curl --fail --location --silent --show-error --output "/tmp/${archive}" "$url"
+          echo "${PROMETHEUS_SHA256}  /tmp/${archive}" | sha256sum --check
+          tar --extract --gzip --file "/tmp/${archive}" --directory /tmp
+          echo "/tmp/prometheus-${PROMETHEUS_VERSION}.linux-amd64" >> "$GITHUB_PATH"
+
+      - name: Validate Prometheus configurations with promtool
+        run: promtool check config monitoring/prometheus/*.yml
+
+      - name: Validate Grafana dashboard JSON and datasource UID
+        run: |
+          jq --exit-status '
+            .title == "K3s Node"
+            and .uid == "brownrook-k3s-node"
+            and (.panels | length >= 5)
+            and ([
+              .. | objects
+              | select(.datasource? and (.datasource | type == "object"))
+              | .datasource.uid
+            ] | length > 0)
+            and ([
+              .. | objects
+              | select(.datasource? and (.datasource | type == "object"))
+              | .datasource.uid
+            ] | all(. == "dfvym4tkfc16oa"))
+          ' monitoring/grafana/dashboards/k3s-node.json > /dev/null

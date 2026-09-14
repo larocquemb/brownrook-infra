@@ -1,0 +1,33 @@
+[Unit]
+Description=Brown Rook node_exporter nftables policy
+Documentation=man:nft(8)
+Wants=network-online.target
+After=network-online.target
+Before=node_exporter.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=-/usr/sbin/nft delete table inet {{ node_exporter_nft_table }}
+ExecStartPre=/usr/sbin/nft --check --file /etc/nftables/brownrook-node-exporter.nft
+ExecStart=/usr/sbin/nft --file /etc/nftables/brownrook-node-exporter.nft
+ExecStop=-/usr/sbin/nft delete table inet {{ node_exporter_nft_table }}
+# RHEL labels nft as iptables_exec_t. NoNewPrivileges would block the
+# SELinux domain transition and cause systemd to fail with 203/EXEC.
+ProtectHome=yes
+ProtectSystem=strict
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=CAP_NET_ADMIN
+AmbientCapabilities=CAP_NET_ADMIN
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

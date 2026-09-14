@@ -25,5 +25,9 @@
 # Local Kubernetes secrets
 kubernetes/helm/idc/*.secret.yaml
 
+# Local Ansible runtime and retry data
+.ansible/
+*.retry
+
 .DS_Store
 **/.DS_Store
