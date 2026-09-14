@@ -1,0 +1,32 @@
+---
+- name: Install Prometheus configuration without the K3s target
+  ansible.builtin.copy:
+    src: "{{ monitoring_server_source_root }}/prometheus/prometheus-without-k3s.yml"
+    dest: "{{ monitoring_server_prometheus_config_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+    validate: "{{ monitoring_server_promtool_path }} check config %s"
+  notify: Reload Prometheus
+
+- name: Remove the K3s Node dashboard from its watched directory
+  ansible.builtin.file:
+    path: "{{ monitoring_server_grafana_dashboard_path }}"
+    state: absent
+  notify: Restart Grafana
+
+- name: Let Grafana delete the provisioned dashboard from its database
+  ansible.builtin.meta: flush_handlers
+
+- name: Remove K3s Grafana provisioning resources
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ monitoring_server_grafana_provider_path }}"
+    - "{{ monitoring_server_grafana_dashboard_dir }}"
+  notify: Restart Grafana
+
+- name: Apply monitoring service changes after removal
+  ansible.builtin.meta: flush_handlers

@@ -1,0 +1,12 @@
+---
+monitoring_server_state: present
+monitoring_server_source_root: "{{ playbook_dir }}/../../monitoring"
+monitoring_server_prometheus_config_path: /etc/prometheus/prometheus.yml
+monitoring_server_promtool_path: /usr/bin/promtool
+monitoring_server_prometheus_service: prometheus.service
+monitoring_server_grafana_service: grafana-server.service
+monitoring_server_grafana_group: grafana
+monitoring_server_grafana_provider_path: /etc/grafana/provisioning/dashboards/brownrook-k3s.yaml
+monitoring_server_grafana_dashboard_dir: /var/lib/grafana/dashboards/brownrook-k3s
+monitoring_server_grafana_dashboard_path: "{{ monitoring_server_grafana_dashboard_dir }}/k3s-node.json"
+monitoring_server_node_exporter_target: "k3s1.brownrook.net:9100"

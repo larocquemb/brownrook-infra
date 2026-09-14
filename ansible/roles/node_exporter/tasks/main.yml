@@ -1,0 +1,14 @@
+---
+- name: Validate requested node_exporter state
+  ansible.builtin.assert:
+    that:
+      - node_exporter_state in ['present', 'absent']
+    fail_msg: "node_exporter_state must be present or absent"
+
+- name: Install node_exporter
+  ansible.builtin.include_tasks: present.yml
+  when: node_exporter_state == 'present'
+
+- name: Remove node_exporter
+  ansible.builtin.include_tasks: absent.yml
+  when: node_exporter_state == 'absent'

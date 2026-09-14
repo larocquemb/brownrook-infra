@@ -1,0 +1,30 @@
+---
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: example
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - localhost:9093
+
+rule_files: []
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090
+
+  - job_name: brownrook-linux
+    scrape_interval: 5s
+    scrape_timeout: 5s
+    static_configs:
+      - targets:
+          - monitoring.idc.brownrook.net:9100
+          - longbow.brownrook.net:9100
+          - pve.brownrook.net:9100
+          - k3s1.brownrook.net:9100

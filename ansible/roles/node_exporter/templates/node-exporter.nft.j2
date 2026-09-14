@@ -1,0 +1,9 @@
+# Managed by Ansible. Allows node_exporter only from the monitoring host.
+table inet {{ node_exporter_nft_table }} {
+    chain input {
+        type filter hook input priority -10; policy accept;
+        iifname "lo" tcp dport 9100 counter accept
+        ip saddr {{ node_exporter_allowed_source }} tcp dport 9100 counter accept
+        tcp dport 9100 counter drop
+    }
+}
