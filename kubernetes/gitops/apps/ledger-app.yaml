@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/larocquemb/home-budget-pipeline.git
     targetRevision: main
-    path: deploy/rabbitmq-private-logging
+    path: deploy/rabbitmq-private-telemetry
   destination:
     server: https://kubernetes.default.svc
     namespace: home-budget
