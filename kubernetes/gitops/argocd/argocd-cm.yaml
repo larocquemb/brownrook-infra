@@ -4,6 +4,20 @@ metadata:
   name: argocd-cm
   namespace: argocd
 data:
+  url: https://argocd.idc.brownrook.com
+  oidc.config: |
+    name: Microsoft Entra ID
+    issuer: https://login.microsoftonline.com/8b07f4bd-41e4-4106-8d49-00c5d79d35a2/v2.0
+    clientID: c563315a-a8cb-4d80-85b8-e57bcb21b35a
+    clientSecret: $oidc.azure.clientSecret
+    requestedIDTokenClaims:
+      groups:
+        essential: true
+        value: ApplicationGroup
+    requestedScopes:
+      - openid
+      - profile
+      - email
   timeout.reconciliation: 30s
   timeout.reconciliation.jitter: 0s
   # Argo CD 3 excludes EndpointSlice by default. Keep the other low-value,
