@@ -6,4 +6,53 @@ metadata:
 data:
   timeout.reconciliation: 30s
   timeout.reconciliation.jitter: 0s
-  
+  # Argo CD 3 excludes EndpointSlice by default. Keep the other low-value,
+  # high-churn resources excluded while allowing the explicitly Git-managed
+  # home-budget external-service EndpointSlice.
+  resource.exclusions: |
+    - apiGroups:
+        - ''
+      kinds:
+        - Endpoints
+    - apiGroups:
+        - coordination.k8s.io
+      kinds:
+        - Lease
+    - apiGroups:
+        - authentication.k8s.io
+        - authorization.k8s.io
+      kinds:
+        - SelfSubjectReview
+        - TokenReview
+        - LocalSubjectAccessReview
+        - SelfSubjectAccessReview
+        - SelfSubjectRulesReview
+        - SubjectAccessReview
+    - apiGroups:
+        - certificates.k8s.io
+      kinds:
+        - CertificateSigningRequest
+    - apiGroups:
+        - cert-manager.io
+      kinds:
+        - CertificateRequest
+    - apiGroups:
+        - cilium.io
+      kinds:
+        - CiliumIdentity
+        - CiliumEndpoint
+        - CiliumEndpointSlice
+    - apiGroups:
+        - kyverno.io
+        - reports.kyverno.io
+        - wgpolicyk8s.io
+      kinds:
+        - PolicyReport
+        - ClusterPolicyReport
+        - EphemeralReport
+        - ClusterEphemeralReport
+        - AdmissionReport
+        - ClusterAdmissionReport
+        - BackgroundScanReport
+        - ClusterBackgroundScanReport
+        - UpdateRequest
