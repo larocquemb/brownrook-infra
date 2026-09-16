@@ -11,6 +11,7 @@ spec:
   - https://github.com/larocquemb/brownrook-infra.git
   - https://github.com/larocquemb/brownrook-idc.git
   - https://github.com/larocquemb/home-budget-pipeline.git
+  - https://kedacore.github.io/charts
 
   destinations:
   - namespace: brownrook-idc
@@ -20,6 +21,8 @@ spec:
   - namespace: argocd
     server: https://kubernetes.default.svc
   - namespace: kube-system
+    server: https://kubernetes.default.svc
+  - namespace: keda
     server: https://kubernetes.default.svc
 
   clusterResourceWhitelist:
