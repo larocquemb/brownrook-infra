@@ -12,6 +12,8 @@ Arsène is the BrownRook K3s GPU worker.
 - GPU: NVIDIA GeForce RTX 3090, 24 GB VRAM
 - K3s role: worker/agent
 - Control plane: `k3s1` at `192.168.2.230`
+- K3s: `v1.36.4+k3s1` on both k3s1 and Arsène
+- containerd: `2.3.4-k3s1.36` on both nodes
 
 ## Host prerequisites
 
@@ -25,7 +27,22 @@ Validated host stack on 2026-09-27:
 - PyTorch CUDA compute: validated
 - Podman CDI GPU access: validated with privileged/root Podman
 
-Do not disable SELinux to support GPU containers.
+SELinux remains enforcing.
+
+## K3s networking
+
+K3s uses the Flannel VXLAN backend. Arsène's default RHEL firewalld configuration blocked VXLAN and forwarded pod-to-pod traffic. This caused CoreDNS timeouts, SMB CSI mount failures, and `No route to host` errors from Arsène workloads connecting to RabbitMQ on k3s1.
+
+The BrownRook cluster currently runs K3s nodes without firewalld. On Arsène:
+
+```bash
+sudo systemctl disable --now firewalld
+sudo systemctl restart k3s-agent
+```
+
+After the agent restart, validation from a pod scheduled on Arsène succeeded for both CoreDNS and RabbitMQ on k3s1.
+
+Do not disable SELinux as part of this networking configuration.
 
 ## Kubernetes configuration
 
@@ -65,7 +82,7 @@ Expected resource:
 nvidia.com/gpu: 1
 ```
 
-End-to-end validation was completed with a CUDA 13.0.2 UBI9 pod scheduled specifically to Arsène with:
+End-to-end GPU validation was completed with a CUDA 13.0.2 UBI9 pod scheduled specifically to Arsène with:
 
 ```yaml
 runtimeClassName: nvidia
@@ -78,6 +95,20 @@ resources:
 
 Inside the pod, `nvidia-smi` successfully reported the RTX 3090 and 24576 MiB VRAM.
 
-## Operational note
+Cross-node networking was also validated from a BusyBox pod scheduled on Arsène:
 
-As of 2026-09-27, Arsène is running K3s v1.36.4+k3s1 while k3s1 is running v1.34.5+k3s1. Align K3s versions as a separate maintenance action.
+```bash
+nc -vz rabbitmq 5672
+```
+
+The RabbitMQ endpoint on k3s1 (`10.42.1.13:5672`) was reachable.
+
+## Control-plane upgrade
+
+On 2026-09-27, k3s1 was upgraded from `v1.34.5+k3s1` through `v1.35.8+k3s1` to `v1.36.4+k3s1`. A verified offline backup of `/var/lib/rancher/k3s/server` was taken before the upgrade.
+
+Final state:
+
+- k3s1: `v1.36.4+k3s1`, containerd `2.3.4-k3s1.36`
+- arsene: `v1.36.4+k3s1`, containerd `2.3.4-k3s1.36`
+- both nodes: `Ready`
