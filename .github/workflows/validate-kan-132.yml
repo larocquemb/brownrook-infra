@@ -1,0 +1,44 @@
+name: Validate KAN-132 assets
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/validate-kan-132.yml"
+      - "docs/kan-132/**"
+      - "scripts/kan-132/**"
+      - "kubernetes/staged/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/validate-kan-132.yml"
+      - "docs/kan-132/**"
+      - "scripts/kan-132/**"
+      - "kubernetes/staged/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+
+      - name: Validate shell syntax
+        run: bash -n scripts/kan-132/*.sh
+
+      - name: Reject unresolved conflict markers and committed credentials
+        run: |
+          ! grep -R -n -E '^(<<<<<<<|=======|>>>>>>>)' \
+            docs/kan-132 scripts/kan-132 kubernetes/staged
+          ! grep -R -n -E '(AKIA[0-9A-Z]{16}|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY)' \
+            docs/kan-132 scripts/kan-132 kubernetes/staged
+
+      - name: Confirm production manifests are still staged
+        run: |
+          ! grep -R -n 'staged/longhorn' kubernetes/gitops/kustomization.yaml
+          grep -q 'targetRevision: 1.12.1' kubernetes/staged/longhorn/application.yaml
+          grep -q 'numberOfReplicas: "3"' kubernetes/staged/longhorn/storage-classes.yaml
