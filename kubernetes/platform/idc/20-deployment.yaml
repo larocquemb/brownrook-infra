@@ -29,6 +29,16 @@ spec:
         brownrook.com/git-commit: "da43b058590482919d7e287edadca453d76f5c13"
         brownrook.com/build-number: "52"
     spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          minDomains: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          matchLabelKeys:
+            - pod-template-hash
+          labelSelector:
+            matchLabels:
+              app: brownrook-idc
       terminationGracePeriodSeconds: 45    
       imagePullSecrets:
         - name: ghcr-secret
@@ -103,4 +113,3 @@ spec:
             capabilities:
               drop:
                 - ALL
-
