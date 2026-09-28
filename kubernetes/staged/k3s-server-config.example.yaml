@@ -1,0 +1,14 @@
+# Merge these settings into /etc/rancher/k3s/config.yaml on every server only
+# after the SQLite-to-etcd conversion gate passes.
+#
+# Preserve the existing cluster/service CIDRs, flannel backend, secrets
+# encryption, node name, and data-dir settings. Do not commit the server token.
+tls-san:
+  - k3s-api.brownrook.net
+  - REPLACE_WITH_INTERNAL_API_VIP
+etcd-snapshot-schedule-cron: "0 */6 * * *"
+etcd-snapshot-retention: 56
+etcd-snapshot-compress: true
+etcd-s3: true
+etcd-s3-config-secret: k3s-etcd-snapshot-s3-config
+etcd-s3-retention: 120
