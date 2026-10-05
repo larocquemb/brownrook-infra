@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: longhorn
+  namespace: argocd
+  annotations:
+    brownrook.net/change-gate: KAN-132-gate-4
+spec:
+  project: default
+  source:
+    repoURL: https://charts.longhorn.io
+    chart: longhorn
+    targetRevision: 1.12.1
+    helm:
+      releaseName: longhorn
+      values: |
+        persistence:
+          defaultClass: false
+          defaultClassReplicaCount: 3
+        defaultSettings:
+          allowVolumeCreationWithDegradedAvailability: false
+          createDefaultDiskLabeledNodes: true
+          defaultDataPath: /var/lib/longhorn
+          defaultReplicaCount: 3
+          replicaAutoBalance: best-effort
+          replicaSoftAntiAffinity: false
+          storageMinimalAvailablePercentage: 15
+          storageOverProvisioningPercentage: 100
+        longhornUI:
+          replicas: 2
+        ingress:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: longhorn-system
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
