@@ -18,20 +18,43 @@
   ansible.builtin.assert:
     that:
       - >-
-        ((jupyter_runtime_password_file.content | b64decode | from_json)
-        .get('PasswordIdentityProvider', {}).get('hashed_password', '') | length) > 0
+        (((jupyter_runtime_password_file.content | b64decode | from_json)
+        .get('PasswordIdentityProvider', {}).get('hashed_password', '') | length) > 0)
+        or
+        (((jupyter_runtime_password_file.content | b64decode | from_json)
+        .get('IdentityProvider', {}).get('hashed_password', '') | length) > 0)
     fail_msg: >-
       Set the Jupyter password as paul with ~/venvs/jupyter/bin/jupyter server password,
       then rerun this playbook. Passwords are preserved on the host and never committed.
   no_log: true
 
-- name: Install Jupyter host dependencies
-  ansible.builtin.package:
-    name:
-      - python3
-      - python3-pip
-      - nftables
-    state: present
+# Query RPM directly: the NVIDIA DNF plugin prints to stdout, which breaks
+# the DNF module's JSON protocol. Keep that plugin enabled for CLI installs.
+- name: Check installed Jupyter host dependencies
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/rpm
+      - -q
+      - "{{ item }}"
+  loop:
+    - python3
+    - python3-pip
+    - nftables
+  register: jupyter_runtime_host_packages
+  changed_when: false
+  failed_when: jupyter_runtime_host_packages.rc not in [0, 1]
+  check_mode: false
+
+- name: Install missing Jupyter host dependencies # noqa command-instead-of-module
+  ansible.builtin.command:
+    argv: >-
+      {{ ['/usr/bin/dnf', '-y', 'install'] +
+      (jupyter_runtime_host_packages.results | selectattr('rc', 'equalto', 1)
+      | map(attribute='item') | list) }}
+  when:
+    - not ansible_check_mode
+    - jupyter_runtime_host_packages.results | selectattr('rc', 'equalto', 1) | list | length > 0
+  changed_when: true
 
 - name: Create Jupyter runtime directories
   ansible.builtin.file:

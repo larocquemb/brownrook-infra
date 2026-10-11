@@ -32,6 +32,7 @@ root SSH. Apply from a controller on the LAN or VPN.
 
 The role requires the existing password hash at
 `/home/paul/.jupyter/jupyter_server_config.json`. It verifies a nonempty
+`IdentityProvider.hashed_password` (written by the password command) or
 `PasswordIdentityProvider.hashed_password` with `no_log`, preserves the file,
 and enforces mode 0600. Passwords, hashes, notebook contents, TLS private keys,
 and SSH credentials are never stored in Git. Bootstrap or change a password
