@@ -1,0 +1,54 @@
+---
+- name: Check that the existing certificate covers the public Jupyter hostname
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - x509
+      - -in
+      - "{{ jupyter_certificate }}"
+      - -noout
+      - -checkhost
+      - "{{ jupyter_hostname }}"
+  register: jupyter_proxy_certificate_check
+  changed_when: false
+  failed_when: "'does match certificate' not in jupyter_proxy_certificate_check.stdout"
+  check_mode: false
+
+- name: Verify the backend from the proxy before publishing its route
+  ansible.builtin.uri:
+    url: "http://{{ jupyter_backend_ip }}:{{ jupyter_backend_port }}/lab"
+    headers:
+      Host: "{{ jupyter_hostname }}"
+    follow_redirects: none
+    status_code: 302
+  when: not ansible_check_mode
+
+- name: Install the Jupyter Nginx route
+  ansible.builtin.template:
+    src: jupyter-arsene.conf.j2
+    dest: /etc/nginx/conf.d/jupyter-arsene.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload Jupyter Nginx
+
+- name: Apply proxy configuration before HTTPS verification
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify HTTPS and the Jupyter login redirect through the local proxy
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --resolve
+      - "{{ jupyter_hostname }}:443:127.0.0.1"
+      - --silent
+      - --show-error
+      - --output
+      - /dev/null
+      - --write-out
+      - "%{http_code}"
+      - "https://{{ jupyter_hostname }}/lab"
+  register: jupyter_proxy_https_response
+  changed_when: false
+  failed_when: jupyter_proxy_https_response.stdout != '302'
+  when: not ansible_check_mode

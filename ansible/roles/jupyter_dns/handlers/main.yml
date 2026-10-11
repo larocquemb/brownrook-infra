@@ -1,0 +1,11 @@
+---
+- name: Validate Jupyter Unbound configuration
+  ansible.builtin.command: unbound-checkconf
+  changed_when: false
+  listen: Reload Jupyter Unbound
+
+- name: Reload Jupyter Unbound service
+  ansible.builtin.systemd_service:
+    name: unbound
+    state: reloaded
+  listen: Reload Jupyter Unbound

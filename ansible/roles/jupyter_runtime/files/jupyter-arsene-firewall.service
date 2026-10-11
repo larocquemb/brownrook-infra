@@ -1,0 +1,12 @@
+[Unit]
+Description=Restrict Arsene Jupyter to the reverse proxy
+Before=jupyter-arsene.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/nft --file /etc/nftables/jupyter-arsene.nft
+RemainAfterExit=yes
+# Keep the rules loaded when this unit is stopped.
+
+[Install]
+WantedBy=multi-user.target
