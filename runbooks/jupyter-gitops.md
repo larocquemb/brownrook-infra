@@ -46,11 +46,12 @@ python3 -m venv /tmp/brownrook-ansible
 /tmp/brownrook-ansible/bin/python -m pip install -r requirements-dev.txt
 source /tmp/brownrook-ansible/bin/activate
 ansible-playbook --syntax-check ansible/playbooks/jupyter.yml
-ansible-playbook ansible/playbooks/jupyter.yml --check --ask-become-pass
+ansible-playbook ansible/playbooks/jupyter.yml --list-hosts
 ansible-playbook ansible/playbooks/jupyter.yml --ask-become-pass
 ```
 
-Check mode previews configuration changes but skips downloads, environment
+After the initial adoption, `--check --ask-become-pass` previews configuration
+changes but skips downloads, environment
 synchronization, service probes and CUDA execution. An initial host missing
 the password file fails preflight deliberately. Apply runs the plays in order:
 Arsene, proxy, then DNS1. It replaces the manual service drop-ins with one

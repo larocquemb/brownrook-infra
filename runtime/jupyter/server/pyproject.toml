@@ -2,7 +2,7 @@
 name = "brownrook-jupyter-server"
 version = "1.0.0"
 requires-python = ">=3.12,<3.13"
-dependencies = ["jupyterlab>=4,<5"]
+dependencies = ["jupyterlab>=4,<5", "pip==26.2.1"]
 
 [tool.uv]
 package = false
