@@ -18,8 +18,11 @@
   ansible.builtin.assert:
     that:
       - >-
-        ((jupyter_runtime_password_file.content | b64decode | from_json)
-        .get('PasswordIdentityProvider', {}).get('hashed_password', '') | length) > 0
+        (((jupyter_runtime_password_file.content | b64decode | from_json)
+        .get('PasswordIdentityProvider', {}).get('hashed_password', '') | length) > 0)
+        or
+        (((jupyter_runtime_password_file.content | b64decode | from_json)
+        .get('IdentityProvider', {}).get('hashed_password', '') | length) > 0)
     fail_msg: >-
       Set the Jupyter password as paul with ~/venvs/jupyter/bin/jupyter server password,
       then rerun this playbook. Passwords are preserved on the host and never committed.
