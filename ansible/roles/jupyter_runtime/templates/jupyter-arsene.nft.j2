@@ -1,0 +1,11 @@
+# Only this dedicated table is replaced, in one nft transaction.
+add table inet jupyter_arsene
+flush table inet jupyter_arsene
+table inet jupyter_arsene {
+    chain input {
+        type filter hook input priority -10; policy accept;
+        iifname "lo" tcp dport {{ jupyter_backend_port }} accept
+        ip saddr {{ jupyter_proxy_ip }} tcp dport {{ jupyter_backend_port }} accept
+        tcp dport {{ jupyter_backend_port }} reject with tcp reset
+    }
+}

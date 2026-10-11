@@ -1,0 +1,16 @@
+---
+jupyter_user: paul
+jupyter_group: paul
+jupyter_home: /home/paul
+jupyter_hostname: jupyter.idc.brownrook.com
+jupyter_backend_ip: 192.168.2.201
+jupyter_backend_port: 8888
+jupyter_proxy_ip: 192.168.2.210
+jupyter_notebooks_dir: /home/paul/notebooks
+jupyter_uv_version: 0.13.0
+jupyter_gpu_python_version: 3.15.0
+jupyter_server_python: /usr/bin/python3.12
+jupyter_uv_binary: /home/paul/venvs/python-tools/bin/uv
+jupyter_projects_dir: /home/paul/.local/share/brownrook/jupyter-envs
+jupyter_certificate: /etc/letsencrypt/live/idc.brownrook.com/fullchain.pem
+jupyter_certificate_key: /etc/letsencrypt/live/idc.brownrook.com/privkey.pem

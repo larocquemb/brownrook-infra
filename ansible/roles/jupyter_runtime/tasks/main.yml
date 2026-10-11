@@ -1,0 +1,267 @@
+---
+- name: Validate the supported Jupyter platform
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['os_family'] == 'RedHat'
+      - ansible_facts['architecture'] == 'x86_64'
+      - jupyter_backend_port | int == 8888
+      - jupyter_home == '/home/' ~ jupyter_user
+    fail_msg: This role supports the existing Arsene x86_64 Red Hat deployment.
+
+- name: Read the existing Jupyter password configuration
+  ansible.builtin.slurp:
+    src: "{{ jupyter_home }}/.jupyter/jupyter_server_config.json"
+  register: jupyter_runtime_password_file
+  no_log: true
+
+- name: Require an existing password before exposing Jupyter
+  ansible.builtin.assert:
+    that:
+      - >-
+        ((jupyter_runtime_password_file.content | b64decode | from_json)
+        .get('PasswordIdentityProvider', {}).get('hashed_password', '') | length) > 0
+    fail_msg: >-
+      Set the Jupyter password as paul with ~/venvs/jupyter/bin/jupyter server password,
+      then rerun this playbook. Passwords are preserved on the host and never committed.
+  no_log: true
+
+- name: Install Jupyter host dependencies
+  ansible.builtin.package:
+    name:
+      - python3
+      - python3-pip
+      - nftables
+    state: present
+
+- name: Create Jupyter runtime directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ jupyter_user }}"
+    group: "{{ jupyter_group }}"
+    mode: "0700"
+  loop:
+    - "{{ jupyter_home }}/venvs"
+    - "{{ jupyter_notebooks_dir }}"
+    - "{{ jupyter_projects_dir }}"
+    - "{{ jupyter_projects_dir }}/server"
+    - "{{ jupyter_projects_dir }}/pytorch315"
+
+- name: Install the pinned Python environment manager
+  ansible.builtin.pip:
+    name: "uv=={{ jupyter_uv_version }}"
+    virtualenv: "{{ jupyter_home }}/venvs/python-tools"
+    virtualenv_command: "{{ jupyter_server_python }} -m venv"
+  become: true
+  become_user: "{{ jupyter_user }}"
+  environment:
+    HOME: "{{ jupyter_home }}"
+
+- name: Copy reviewed manifests and lockfiles
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../runtime/jupyter/{{ item.0 }}/{{ item.1 }}"
+    dest: "{{ jupyter_projects_dir }}/{{ item.0 }}/{{ item.1 }}"
+    owner: "{{ jupyter_user }}"
+    group: "{{ jupyter_group }}"
+    mode: "0600"
+  loop: "{{ ['server', 'pytorch315'] | product(['pyproject.toml', 'uv.lock']) | list }}"
+
+- name: Install the pinned Python 3.15 interpreter alongside system Python
+  ansible.builtin.command:
+    argv:
+      - "{{ jupyter_uv_binary }}"
+      - python
+      - install
+      - "{{ jupyter_gpu_python_version }}"
+  become: true
+  become_user: "{{ jupyter_user }}"
+  environment:
+    HOME: "{{ jupyter_home }}"
+  register: jupyter_runtime_python_install
+  changed_when: "'Installed Python' in jupyter_runtime_python_install.stderr"
+  when: not ansible_check_mode
+
+- name: Synchronize the Jupyter server from the committed lockfile
+  ansible.builtin.command:
+    argv:
+      - "{{ jupyter_uv_binary }}"
+      - sync
+      - --locked
+      - --no-dev
+      - --no-install-project
+      - --project
+      - "{{ jupyter_projects_dir }}/server"
+      - --python
+      - "{{ jupyter_server_python }}"
+  become: true
+  become_user: "{{ jupyter_user }}"
+  environment:
+    HOME: "{{ jupyter_home }}"
+    UV_PROJECT_ENVIRONMENT: "{{ jupyter_home }}/venvs/jupyter"
+  register: jupyter_runtime_server_sync
+  changed_when: >-
+    'Installed ' in jupyter_runtime_server_sync.stderr or
+    'Uninstalled ' in jupyter_runtime_server_sync.stderr
+  notify: Restart Jupyter
+  when: not ansible_check_mode
+
+- name: Synchronize the new GPU kernel from the committed lockfile
+  ansible.builtin.command:
+    argv:
+      - "{{ jupyter_uv_binary }}"
+      - sync
+      - --locked
+      - --no-dev
+      - --no-install-project
+      - --project
+      - "{{ jupyter_projects_dir }}/pytorch315"
+      - --python
+      - "{{ jupyter_gpu_python_version }}"
+  become: true
+  become_user: "{{ jupyter_user }}"
+  environment:
+    HOME: "{{ jupyter_home }}"
+    UV_PROJECT_ENVIRONMENT: "{{ jupyter_home }}/venvs/pytorch315"
+  register: jupyter_runtime_gpu_sync
+  changed_when: >-
+    'Installed ' in jupyter_runtime_gpu_sync.stderr or
+    'Uninstalled ' in jupyter_runtime_gpu_sync.stderr
+  when: not ansible_check_mode
+
+- name: Create the new GPU kernelspec directory
+  ansible.builtin.file:
+    path: "{{ jupyter_home }}/.local/share/jupyter/kernels/arsene-pytorch315"
+    state: directory
+    owner: "{{ jupyter_user }}"
+    group: "{{ jupyter_group }}"
+    mode: "0700"
+
+- name: Install the Python 3.15 GPU kernelspec
+  ansible.builtin.template:
+    src: kernel.json.j2
+    dest: "{{ jupyter_home }}/.local/share/jupyter/kernels/arsene-pytorch315/kernel.json"
+    owner: "{{ jupyter_user }}"
+    group: "{{ jupyter_group }}"
+    mode: "0600"
+
+- name: Manage the existing password file permissions
+  ansible.builtin.file:
+    path: "{{ jupyter_home }}/.jupyter/jupyter_server_config.json"
+    owner: "{{ jupyter_user }}"
+    group: "{{ jupyter_group }}"
+    mode: "0600"
+
+- name: Install the Jupyter server configuration
+  ansible.builtin.template:
+    src: jupyter_server_config.py.j2
+    dest: "{{ jupyter_home }}/.jupyter/jupyter_server_config.py"
+    owner: "{{ jupyter_user }}"
+    group: "{{ jupyter_group }}"
+    mode: "0600"
+  notify: Restart Jupyter
+
+- name: Create the firewall configuration directory
+  ansible.builtin.file:
+    path: /etc/nftables
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the dedicated Jupyter firewall rules
+  ansible.builtin.template:
+    src: jupyter-arsene.nft.j2
+    dest: /etc/nftables/jupyter-arsene.nft
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/nft --check --file %s
+  notify: Restart Jupyter firewall
+
+- name: Install the Jupyter firewall service
+  ansible.builtin.copy:
+    src: jupyter-arsene-firewall.service
+    dest: /etc/systemd/system/jupyter-arsene-firewall.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload Jupyter systemd
+    - Restart Jupyter firewall
+
+- name: Install the Jupyter service
+  ansible.builtin.template:
+    src: jupyter-arsene.service.j2
+    dest: /etc/systemd/system/jupyter-arsene.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload Jupyter systemd
+    - Restart Jupyter
+
+- name: Remove the superseded manually configured service drop-ins
+  ansible.builtin.file:
+    path: "/etc/systemd/system/jupyter-arsene.service.d/{{ item }}"
+    state: absent
+  loop:
+    - firewall.conf
+    - launcher.conf
+  notify:
+    - Reload Jupyter systemd
+    - Restart Jupyter
+
+- name: Enable and start the dedicated Jupyter firewall
+  ansible.builtin.systemd_service:
+    name: jupyter-arsene-firewall
+    daemon_reload: true
+    enabled: true
+    state: started
+
+- name: Enable and start Jupyter
+  ansible.builtin.systemd_service:
+    name: jupyter-arsene
+    enabled: true
+    state: started
+
+- name: Apply service changes before verification
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify Jupyter redirects an unauthenticated GET to login
+  ansible.builtin.uri:
+    url: "http://{{ jupyter_backend_ip }}:{{ jupyter_backend_port }}/lab"
+    headers:
+      Host: "{{ jupyter_hostname }}"
+    follow_redirects: none
+    status_code: 302
+  register: jupyter_runtime_response
+  retries: 10
+  delay: 2
+  until: jupyter_runtime_response.status == 302
+  when: not ansible_check_mode
+
+- name: Verify unauthenticated notebook API access is rejected
+  ansible.builtin.uri:
+    url: "http://{{ jupyter_backend_ip }}:{{ jupyter_backend_port }}/api/kernels"
+    headers:
+      Host: "{{ jupyter_hostname }}"
+    status_code: 403
+  when: not ansible_check_mode
+
+- name: Install the CUDA verification script
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../scripts/jupyter/cuda_smoke.py"
+    dest: "{{ jupyter_projects_dir }}/cuda_smoke.py"
+    owner: "{{ jupyter_user }}"
+    group: "{{ jupyter_group }}"
+    mode: "0600"
+
+- name: Verify the new GPU kernel and its CUDA dependencies
+  ansible.builtin.command:
+    argv:
+      - "{{ jupyter_home }}/venvs/pytorch315/bin/python"
+      - "{{ jupyter_projects_dir }}/cuda_smoke.py"
+  become: true
+  become_user: "{{ jupyter_user }}"
+  changed_when: false
+  when: not ansible_check_mode

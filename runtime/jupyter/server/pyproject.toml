@@ -1,0 +1,9 @@
+[project]
+name = "brownrook-jupyter-server"
+version = "1.0.0"
+requires-python = ">=3.12,<3.13"
+dependencies = ["jupyterlab>=4,<5"]
+
+[tool.uv]
+package = false
+environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]

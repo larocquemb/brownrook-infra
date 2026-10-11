@@ -1,0 +1,11 @@
+---
+- name: Validate Jupyter Nginx configuration
+  ansible.builtin.command: nginx -t
+  changed_when: false
+  listen: Reload Jupyter Nginx
+
+- name: Reload Jupyter Nginx service
+  ansible.builtin.systemd_service:
+    name: nginx
+    state: reloaded
+  listen: Reload Jupyter Nginx

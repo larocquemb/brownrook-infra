@@ -1,0 +1,21 @@
+---
+- name: Configure Arsene Jupyter and the Python 3.15 GPU kernel
+  hosts: jupyter_servers
+  become: true
+  gather_facts: true
+  roles:
+    - role: jupyter_runtime
+
+- name: Configure the public Jupyter reverse proxy
+  hosts: jupyter_proxies
+  become: true
+  gather_facts: true
+  roles:
+    - role: jupyter_proxy
+
+- name: Configure the internal Jupyter DNS override
+  hosts: jupyter_dns_servers
+  become: true
+  gather_facts: true
+  roles:
+    - role: jupyter_dns
