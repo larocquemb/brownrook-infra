@@ -17,6 +17,7 @@ variables.update(jupyter_certificate=str(output / "test-cert.pem"),
 env = Environment(undefined=StrictUndefined)
 env.filters["to_json"] = json.dumps
 for role, template, filename in (
+    ("jupyter_runtime", "jupyter-arsene.service.j2", "jupyter-arsene.service"),
     ("jupyter_runtime", "jupyter-arsene.nft.j2", "jupyter.nft"),
     ("jupyter_runtime", "kernel.json.j2", "kernel.json"),
     ("jupyter_runtime", "jupyter_server_config.py.j2", "jupyter_server_config.py"),

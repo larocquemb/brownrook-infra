@@ -17,6 +17,11 @@ The existing Python 3.12 PyTorch venv and kernelspec are retained.
 - `runtime/jupyter/pytorch315/uv.lock` locks all GPU dependencies, including
   PyTorch 2.14.1 CUDA 13.0, torchvision 0.29.1 and compatible mpmath 1.3.0.
 - Python 3.15.0 is installed by pinned uv 0.13.0 alongside the OS interpreter.
+- Jupyter and new kernels inherit `OLLAMA_HOST` and `OLLAMA_BASE_URL` pointing
+  to the managed Ollama service at `http://192.168.2.201:11434`. Set
+  `jupyter_ollama_url` in the production group variables to change this endpoint.
+  PyTorch execution is independent of these settings; code must explicitly
+  call Ollama to use inference. Clients that hard-code an endpoint override them.
 
 This is Git-managed Ansible infrastructure. CI validates pull requests; host
 changes are applied by the operator after review. There is no automatic host
@@ -76,6 +81,19 @@ actual CUDA matrix multiplication under Python 3.15. The GPU smoke test is
 Refresh JupyterLab and choose **Arsene PyTorch — Python 3.15**. Run the smoke
 script in that kernel. Test a notebook from cellular data to verify the public
 DNS/NAT path and WebSocket execution, which LAN checks cannot prove.
+
+After changing the Ollama endpoint, save notebooks before applying: the Jupyter
+service restarts. Restart existing kernels so they inherit the new environment.
+Verify inside the restarted kernel:
+
+```python
+import os
+print(os.environ.get("OLLAMA_HOST"))
+print(os.environ.get("OLLAMA_BASE_URL"))
+```
+
+Both should print the managed endpoint. These variables do not configure or
+restart the Ollama server itself.
 
 ## Review an upgrade
 
