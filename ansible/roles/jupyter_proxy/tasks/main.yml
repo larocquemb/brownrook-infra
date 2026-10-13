@@ -1,4 +1,81 @@
 ---
+- name: Check the external internal Jupyter identity on the controller
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ jupyter_internal_certificate_source }}"
+    - "{{ jupyter_internal_key_source }}"
+    - "{{ jupyter_internal_ca_source }}"
+  delegate_to: localhost
+  become: false
+  register: jupyter_proxy_internal_identity
+  no_log: true
+
+- name: Require the Brownrook CA leaf identity before deploying the internal alias
+  ansible.builtin.assert:
+    that:
+      - item.stat.isreg | default(false)
+    fail_msg: Issue the jupyter-arsene identity under brownrook-ca/leafs with SAN jupyter.arsene.brownrook.net before applying. Keep private keys outside Git.
+  loop: "{{ jupyter_proxy_internal_identity.results }}"
+  no_log: true
+
+- name: Create the private internal Jupyter TLS directory
+  ansible.builtin.file:
+    path: /etc/nginx/tls/jupyter-arsene
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Deploy the external Brownrook CA leaf identity
+  ansible.builtin.copy:
+    src: "{{ item.source }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0600"
+  loop:
+    - {source: "{{ jupyter_internal_certificate_source }}", dest: "{{ jupyter_internal_certificate }}"}
+    - {source: "{{ jupyter_internal_key_source }}", dest: "{{ jupyter_internal_key }}"}
+    - {source: "{{ jupyter_internal_ca_source }}", dest: "{{ jupyter_internal_ca }}"}
+  no_log: true
+  notify: Reload Jupyter Nginx
+
+- name: Validate the internal certificate chain and DNS identity
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - verify
+      - -CAfile
+      - "{{ jupyter_internal_ca }}"
+      - -untrusted
+      - "{{ jupyter_internal_certificate }}"
+      - -verify_hostname
+      - "{{ jupyter_internal_hostname }}"
+      - -purpose
+      - sslserver
+      - "{{ jupyter_internal_certificate }}"
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Verify the internal certificate matches its private key
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - -c
+      - |
+        import subprocess, sys
+        cert, key = sys.argv[1:]
+        cert_pub = subprocess.check_output(['openssl', 'x509', '-in', cert, '-pubkey', '-noout'])
+        key_pub = subprocess.check_output(['openssl', 'pkey', '-in', key, '-pubout'])
+        if cert_pub != key_pub:
+            raise SystemExit('Internal Jupyter certificate does not match its private key')
+      - "{{ jupyter_internal_certificate }}"
+      - "{{ jupyter_internal_key }}"
+  changed_when: false
+  no_log: true
+  when: not ansible_check_mode
+
 - name: Check that the existing certificate covers the public Jupyter hostname
   ansible.builtin.command:
     argv:
@@ -51,4 +128,24 @@
   register: jupyter_proxy_https_response
   changed_when: false
   failed_when: jupyter_proxy_https_response.stdout != '302'
+  when: not ansible_check_mode
+
+- name: Verify authenticated HTTPS routing on the internal alias with Brownrook CA trust
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --resolve
+      - "{{ jupyter_internal_hostname }}:443:127.0.0.1"
+      - --cacert
+      - "{{ jupyter_internal_ca }}"
+      - --silent
+      - --show-error
+      - --output
+      - /dev/null
+      - --write-out
+      - "%{http_code}"
+      - "https://{{ jupyter_internal_hostname }}/lab"
+  register: jupyter_proxy_internal_https_response
+  changed_when: false
+  failed_when: jupyter_proxy_internal_https_response.stdout != '302'
   when: not ansible_check_mode

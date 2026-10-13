@@ -6,5 +6,5 @@ c.ServerApp.port_retries = 0
 c.ServerApp.open_browser = False
 c.ServerApp.root_dir = {{ jupyter_notebooks_dir | to_json }}
 c.ServerApp.trust_xheaders = True
-c.ServerApp.local_hostnames = ["localhost", {{ jupyter_hostname | to_json }}]
+c.ServerApp.local_hostnames = ["localhost", {{ jupyter_hostname | to_json }}, {{ jupyter_internal_hostname | to_json }}]
 c.PasswordIdentityProvider.password_required = True

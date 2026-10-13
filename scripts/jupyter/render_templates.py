@@ -13,7 +13,9 @@ output = args.output.resolve()
 output.mkdir(parents=True, exist_ok=True)
 variables = yaml.safe_load((root / "ansible/inventories/production/group_vars/jupyter.yml").read_text())
 variables.update(jupyter_certificate=str(output / "test-cert.pem"),
-                 jupyter_certificate_key=str(output / "test-key.pem"))
+                 jupyter_certificate_key=str(output / "test-key.pem"),
+                 jupyter_internal_certificate=str(output / "test-cert.pem"),
+                 jupyter_internal_key=str(output / "test-key.pem"))
 env = Environment(undefined=StrictUndefined)
 env.filters["to_json"] = json.dumps
 for role, template, filename in (

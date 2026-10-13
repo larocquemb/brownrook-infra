@@ -16,9 +16,10 @@
     argv:
       - dig
       - "@127.0.0.1"
-      - "{{ jupyter_hostname }}"
+      - "{{ item }}"
       - A
       - +short
+  loop: "{{ [jupyter_hostname, jupyter_internal_hostname] }}"
   register: jupyter_dns_answer
   changed_when: false
   failed_when: jupyter_dns_answer.stdout != jupyter_proxy_ip

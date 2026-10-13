@@ -1,0 +1,21 @@
+# Public CSR metadata; generated keys and certificates stay outside Git.
+[req]
+default_md = sha384
+prompt = no
+distinguished_name = dn
+req_extensions = req_ext
+
+[dn]
+C = CA
+ST = Manitoba
+L = Ile-des-Chenes
+O = Brown Rook
+OU = Architecture & Design
+CN = jupyter.arsene.brownrook.net
+
+[req_ext]
+subjectAltName = @alt_names
+extendedKeyUsage = serverAuth
+
+[alt_names]
+DNS.1 = jupyter.arsene.brownrook.net

@@ -1,4 +1,6 @@
-# Managed by Ansible. Only this hostname is overridden.
+# Managed by Ansible. Override only the two Jupyter hostnames.
 server:
-  local-zone: "{{ jupyter_hostname }}." static
-  local-data: "{{ jupyter_hostname }}. 300 IN A {{ jupyter_proxy_ip }}"
+{% for hostname in [jupyter_hostname, jupyter_internal_hostname] %}
+  local-zone: "{{ hostname }}." static
+  local-data: "{{ hostname }}. 300 IN A {{ jupyter_proxy_ip }}"
+{% endfor %}

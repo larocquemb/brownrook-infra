@@ -18,7 +18,7 @@ The existing Python 3.12 PyTorch venv and kernelspec are retained.
   PyTorch 2.14.1 CUDA 13.0, torchvision 0.29.1 and compatible mpmath 1.3.0.
 - Python 3.15.0 is installed by pinned uv 0.13.0 alongside the OS interpreter.
 - Jupyter and new kernels inherit `OLLAMA_HOST` and `OLLAMA_BASE_URL` pointing
-  to the managed Ollama service at `http://192.168.2.201:11434`. Set
+  to the managed Ollama service at `http://192.168.2.201:11436`. Set
   `jupyter_ollama_url` in the production group variables to change this endpoint.
   PyTorch execution is independent of these settings; code must explicitly
   call Ollama to use inference. Clients that hard-code an endpoint override them.
@@ -117,3 +117,47 @@ working venv and kernel are not managed or removed by this playbook.
 For a managed environment rollback, revert its manifest and lockfile together
 in Git, review and merge, then reapply. Service or proxy configuration rolls
 back the same way. Host password files and notebooks remain outside Git.
+
+## Internal Brownrook CA alias (KAN-135)
+
+Both https://jupyter.idc.brownrook.com/ and
+https://jupyter.arsene.brownrook.net/ reach the same authenticated Jupyter service
+and Python 3.15 GPU kernel. DNS1 resolves both names to the existing proxy VM.
+The internal route accepts LAN 192.168.2.0/24 and VPN 10.6.0.0/24 clients;
+the public route retains its existing Let's Encrypt wildcard certificate.
+
+Before applying the proxy role, issue a server leaf using the existing Brownrook
+CA/YubiKey workflow. Reviewed CSR and GnuTLS issuance templates are in
+`pki/jupyter-arsene/`. Use those templates with DNS SAN `jupyter.arsene.brownrook.net` and serverAuth
+usage. Store these files outside Git:
+
+- `~/brownrook-ca/leafs/jupyter-arsene/jupyter-arsene.key`
+- `~/brownrook-ca/leafs/jupyter-arsene/jupyter-arsene.fullchain.crt`
+  (leaf first, followed by intermediate CA certificates)
+- `~/brownrook-ca/root/root_ca.crt`
+
+Set `BROWNROOK_PKI_DIR` to override the default CA directory, or override the
+source variables in the inventory for an existing identity. Ansible validates
+chain, DNS identity, and key matching before publishing the internal route.
+The private key is copied with mode 0600 and never printed or committed.
+For renewal, issue/renew the same SAN through the CA workflow, replace the
+external fullchain/key files, and reapply the reviewed Git configuration.
+A changed identity reloads Nginx; no manual Nginx configuration edit is needed.
+
+Install the Brownrook root CA in each LAN/VPN client's browser/OS trust store.
+For a terminal-only check, without bypassing certificate validation:
+
+```sh
+curl --cacert ~/brownrook-ca/root/root_ca.crt -I https://jupyter.arsene.brownrook.net/login
+```
+
+Verify both addresses from LAN and VPN: sign in, start the Arsene PyTorch kernel,
+and run `scripts/jupyter/cuda_smoke.py` in a notebook. Kernel WebSocket access
+requires an authenticated browser test; the playbook's redirect probes do not
+prove it. Kernels execute on Arsene, not on the browser machine.
+
+Jupyter inherits the development GPU Ollama endpoint on port 11436. Notebook
+PyTorch CUDA operations and development Ollama share the RTX 3090 VRAM.
+Avoid simultaneous large loads; unload an idle Ollama model using
+`OLLAMA_HOST=http://192.168.2.201:11436 ollama stop MODEL` before a large CUDA
+notebook experiment. Production CPU Ollama on 11434 does not use GPU memory.
