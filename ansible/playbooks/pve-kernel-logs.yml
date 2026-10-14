@@ -1,0 +1,6 @@
+---
+- name: Forward Proxmox kernel journals to the existing Loki service
+  hosts: kernel_log_servers
+  become: true
+  roles:
+    - role: pve_kernel_logs
