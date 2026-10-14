@@ -115,9 +115,7 @@
 
 - name: Check journal access as the actual service user
   ansible.builtin.command:
-    argv: [journalctl, --no-pager, -n, '1', _TRANSPORT=kernel, --output=json]
-  become: true
-  become_user: alloy
+    argv: [/usr/sbin/runuser, -u, alloy, --, journalctl, --no-pager, -n, '1', _TRANSPORT=kernel, --output=json]
   register: pve_kernel_logs_journal_probe
   changed_when: false
   failed_when: "'MESSAGE' not in pve_kernel_logs_journal_probe.stdout"
