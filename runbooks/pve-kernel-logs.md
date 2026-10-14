@@ -77,3 +77,14 @@ Explore to Last 7 days and verify the earliest available timestamps.
 The source backfill window is separate from local journal retention and Loki
 retention. The role preserves existing retention settings. If older entries
 were already deleted, they cannot be recovered by installing a collector.
+
+
+Loki delivery uses monitoring's fixed LAN IP 192.168.2.202 while TLS SNI and
+certificate verification still require monitoring.idc.brownrook.net. No insecure
+TLS bypass is used, and delivery does not require DNS1 to be available. The
+readiness check uses the same hostname/IP mapping and mTLS identity.
+
+The observed Loki configuration retains logs for two weeks and rejects entries
+older than one week. The seven-day startup window fits that policy; entries near
+the age boundary can still expire before delivery. There is no retention change
+in this PR.

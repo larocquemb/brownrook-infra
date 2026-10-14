@@ -73,7 +73,9 @@
 
 - name: Install pinned native Alloy without starting a default collector
   ansible.builtin.apt:
-    name: "alloy={{ pve_kernel_logs_alloy_version }}"
+    name:
+      - "alloy={{ pve_kernel_logs_alloy_version }}"
+      - curl
     state: present
     update_cache: true
     cache_valid_time: "{{ 0 if pve_kernel_logs_repository.changed else 3600 }}"
@@ -121,14 +123,27 @@
   failed_when: "'MESSAGE' not in pve_kernel_logs_journal_probe.stdout"
   when: not ansible_check_mode
 
-- name: Validate Loki TLS connectivity using the client identity
-  ansible.builtin.uri:
-    url: "https://{{ pve_kernel_logs_loki_hostname }}:3100/ready"
-    ca_path: /etc/alloy/tls/ca.crt
-    client_cert: /etc/alloy/tls/client.crt
-    client_key: /etc/alloy/tls/client.key
-    use_proxy: false
-    status_code: 200
+- name: Validate Loki mTLS without depending on DNS
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --silent
+      - --show-error
+      - --fail
+      - --max-time
+      - '10'
+      - --noproxy
+      - '*'
+      - --resolve
+      - "{{ pve_kernel_logs_loki_hostname }}:3100:{{ pve_kernel_logs_loki_address }}"
+      - --cacert
+      - /etc/alloy/tls/ca.crt
+      - --cert
+      - /etc/alloy/tls/client.crt
+      - --key
+      - /etc/alloy/tls/client.key
+      - "https://{{ pve_kernel_logs_loki_hostname }}:3100/ready"
+  changed_when: false
   when: not ansible_check_mode
 
 - name: Install the validated kernel-only collector

@@ -1,6 +1,7 @@
 ---
 pve_kernel_logs_alloy_version: 1.20.1-1
-pve_kernel_logs_loki_url: https://monitoring.idc.brownrook.net:3100/loki/api/v1/push
+pve_kernel_logs_loki_address: 192.168.2.202
+pve_kernel_logs_loki_url: "https://{{ pve_kernel_logs_loki_address }}:3100/loki/api/v1/push"
 pve_kernel_logs_loki_hostname: monitoring.idc.brownrook.net
 pve_kernel_logs_max_age: 168h
 pve_kernel_logs_pki_dir: "{{ lookup('ansible.builtin.env', 'BROWNROOK_PKI_DIR') | default(lookup('ansible.builtin.env', 'HOME') ~ '/brownrook-ca', true) }}"
