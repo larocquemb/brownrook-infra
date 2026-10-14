@@ -1,0 +1,9 @@
+# Strategic merge patch for the existing Argo CD v3.3.2 Deployment.
+# This is not a standalone Deployment manifest.
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: copyutil
+          args:
+            - /bin/cp --update=none /usr/local/bin/argocd /var/run/argocd/argocd && /bin/ln -sf /var/run/argocd/argocd /var/run/argocd/argocd-cmp-server
