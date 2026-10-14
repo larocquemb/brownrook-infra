@@ -96,7 +96,7 @@ jobs:
           from jinja2 import Environment, StrictUndefined
           source = Path('ansible/roles/pve_kernel_logs/templates/config.alloy.j2')
           rendered = Environment(undefined=StrictUndefined).from_string(source.read_text()).render(
-              inventory_hostname='pve', pve_kernel_logs_max_age='48h',
+              inventory_hostname='pve', pve_kernel_logs_max_age='168h',
               pve_kernel_logs_loki_url='https://monitoring.idc.brownrook.net:3100/loki/api/v1/push',
               pve_kernel_logs_loki_hostname='monitoring.idc.brownrook.net')
           Path('/tmp/pve-kernel.alloy').write_text(rendered)

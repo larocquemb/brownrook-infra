@@ -39,7 +39,7 @@ For hardware diagnostics:
 
 Entries preserve the original JSON journal fields, including timestamps and boot
 ID. Severity becomes a low-cardinality `level` label. Set Explore's time range
-appropriately: first startup reads retained entries from up to 48 hours ago.
+appropriately: first startup reads retained entries from up to seven days (168 hours) ago.
 Existing NIC outage logs can be recovered if still present in the local journal
 and accepted by Loki's retention/ingestion policy.
 
@@ -63,3 +63,17 @@ its Git configuration, and remove only its pve-kernel.conf override/configuratio
 once forwarding is no longer required. Retain /var/lib/alloy for recovery and
 never delete PVE journal files. Do not run unrelated monitoring reconciliation
 against PVE; this playbook owns only the kernel collector.
+
+
+## Seven-day backfill
+
+`pve_kernel_logs_max_age: 168h` requests up to the last seven days on initial
+startup. It does not reconstruct missing/rotated journal files or override Loki
+age rejection and out-of-order limits. A persisted journal cursor controls
+subsequent restarts; changing max_age does not rewind an already-established
+cursor. Configure the requested window before the first apply. Set Grafana
+Explore to Last 7 days and verify the earliest available timestamps.
+
+The source backfill window is separate from local journal retention and Loki
+retention. The role preserves existing retention settings. If older entries
+were already deleted, they cannot be recovered by installing a collector.
