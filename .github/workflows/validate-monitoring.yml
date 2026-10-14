@@ -53,6 +53,7 @@ jobs:
       - name: Check Ansible playbook syntax
         run: |
           ansible-playbook --syntax-check ansible/playbooks/site.yml
+          ansible-playbook --syntax-check ansible/playbooks/pve-kernel-logs.yml
           ansible-playbook --syntax-check ansible/playbooks/remove-node-monitoring.yml
 
       - name: Install pinned promtool
@@ -87,3 +88,18 @@ jobs:
               | .datasource.uid
             ] | all(. == "dfvym4tkfc16oa"))
           ' monitoring/grafana/dashboards/k3s-node.json > /dev/null
+
+      - name: Validate PVE kernel collector with pinned Alloy
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from jinja2 import Environment, StrictUndefined
+          source = Path('ansible/roles/pve_kernel_logs/templates/config.alloy.j2')
+          rendered = Environment(undefined=StrictUndefined).from_string(source.read_text()).render(
+              inventory_hostname='pve', pve_kernel_logs_max_age='48h',
+              pve_kernel_logs_loki_url='https://monitoring.idc.brownrook.net:3100/loki/api/v1/push',
+              pve_kernel_logs_loki_hostname='monitoring.idc.brownrook.net')
+          Path('/tmp/pve-kernel.alloy').write_text(rendered)
+          PY
+          docker run --rm -v /tmp/pve-kernel.alloy:/etc/alloy/config.alloy:ro \
+            grafana/alloy:v1.20.1 validate /etc/alloy/config.alloy
