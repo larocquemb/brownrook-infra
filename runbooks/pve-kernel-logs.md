@@ -88,3 +88,10 @@ The observed Loki configuration retains logs for two weeks and rejects entries
 older than one week. The seven-day startup window fits that policy; entries near
 the age boundary can still expire before delivery. There is no retention change
 in this PR.
+
+
+If Loki returns HTTP 503 while its ingesters become ready, the mTLS preflight
+retries for about 40 seconds. Persistent errors still fail before collector
+activation. Rerunning after an interrupted initial install accepts the inactive,
+unmodified package-default configuration, verified against dpkg's conffile
+checksum. A custom configuration or active unrelated collector is not adopted.

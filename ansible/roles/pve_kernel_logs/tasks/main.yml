@@ -29,6 +29,7 @@
 - name: Inspect an existing collector configuration before adoption
   ansible.builtin.stat:
     path: /etc/alloy/config.alloy
+    checksum_algorithm: md5
   register: pve_kernel_logs_existing
 
 - name: Read existing collector ownership marker
@@ -38,10 +39,30 @@
   when: pve_kernel_logs_existing.stat.exists
   no_log: true
 
+- name: Read collector state before adopting a package default
+  ansible.builtin.service_facts:
+
+- name: Read package-owned configuration checksums
+  ansible.builtin.command:
+    argv: [dpkg-query, --show, '--showformat=${Conffiles}', alloy]
+    expand_argument_vars: false
+  register: pve_kernel_logs_package_files
+  changed_when: false
+  failed_when: pve_kernel_logs_package_files.rc not in [0, 1]
+  check_mode: false
+  when: pve_kernel_logs_existing.stat.exists
+
 - name: Preserve unrelated Alloy configurations
   ansible.builtin.assert:
     that:
-      - (pve_kernel_logs_existing_content.content | b64decode).startswith('// Managed by brownrook-infra: PVE kernel journals only.')
+      - >-
+        (pve_kernel_logs_existing_content.content | b64decode).startswith(
+          '// Managed by brownrook-infra: PVE kernel journals only.')
+        or (
+          ('/etc/alloy/config.alloy ' ~ (pve_kernel_logs_existing.stat.checksum | default('missing')))
+            in pve_kernel_logs_package_files.stdout
+          and ansible_facts.services.get('alloy.service', {}).get('state', '') != 'running'
+        )
     fail_msg: An unrelated Alloy configuration exists on PVE; merge its collection requirements before adoption.
   when: pve_kernel_logs_existing.stat.exists
   no_log: true
@@ -141,7 +162,11 @@
       - --key
       - /etc/alloy/tls/client.key
       - "https://{{ pve_kernel_logs_loki_hostname }}:3100/ready"
+  register: pve_kernel_logs_loki_ready
   changed_when: false
+  retries: 20
+  delay: 2
+  until: pve_kernel_logs_loki_ready.rc == 0
   when: not ansible_check_mode
 
 - name: Install the validated kernel-only collector

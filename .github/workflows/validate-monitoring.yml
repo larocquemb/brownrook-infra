@@ -9,6 +9,7 @@ on:
       - "ansible.cfg"
       - "ansible/**"
       - "monitoring/**"
+      - "scripts/pve/**"
       - "requirements-dev.txt"
   push:
     branches:
@@ -19,6 +20,7 @@ on:
       - "ansible.cfg"
       - "ansible/**"
       - "monitoring/**"
+      - "scripts/pve/**"
       - "requirements-dev.txt"
 
 permissions:
@@ -55,6 +57,9 @@ jobs:
           ansible-playbook --syntax-check ansible/playbooks/site.yml
           ansible-playbook --syntax-check ansible/playbooks/pve-kernel-logs.yml
           ansible-playbook --syntax-check ansible/playbooks/remove-node-monitoring.yml
+
+      - name: Verify safe PVE collector adoption
+        run: python scripts/pve/test_collector_adoption.py
 
       - name: Install pinned promtool
         env:
