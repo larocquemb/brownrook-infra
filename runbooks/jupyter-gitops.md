@@ -121,34 +121,34 @@ back the same way. Host password files and notebooks remain outside Git.
 ## Internal Brownrook CA alias (KAN-135)
 
 Both https://jupyter.idc.brownrook.com/ and
-https://jupyter.arsene.brownrook.net/ reach the same authenticated Jupyter service
+https://jupyter.idc.brownrook.net/ reach the same authenticated Jupyter service
 and Python 3.15 GPU kernel. DNS1 resolves both names to the existing proxy VM.
 The internal route accepts LAN 192.168.2.0/24 and VPN 10.6.0.0/24 clients;
 the public route retains its existing Let's Encrypt wildcard certificate.
 
-Before applying the proxy role, issue a server leaf using the existing Brownrook
-CA/YubiKey workflow. Reviewed CSR and GnuTLS issuance templates are in
-`pki/jupyter-arsene/`. Use those templates with DNS SAN `jupyter.arsene.brownrook.net` and serverAuth
-usage. Store these files outside Git:
+Reuse the existing Brownrook CA wildcard certificate covering
+`*.idc.brownrook.net`. No new certificate or YubiKey signing is required.
 
-- `~/brownrook-ca/leafs/jupyter-arsene/jupyter-arsene.key`
-- `~/brownrook-ca/leafs/jupyter-arsene/jupyter-arsene.fullchain.crt`
-  (leaf first, followed by intermediate CA certificates)
+The external files are:
+
+- `~/brownrook-ca/leafs/k3ingress/k3ingress.fullchain.crt`
+- `~/brownrook-ca/leafs/k3ingress/k3ingress.key`
 - `~/brownrook-ca/root/root_ca.crt`
 
-Set `BROWNROOK_PKI_DIR` to override the default CA directory, or override the
-source variables in the inventory for an existing identity. Ansible validates
-chain, DNS identity, and key matching before publishing the internal route.
-The private key is copied with mode 0600 and never printed or committed.
-For renewal, issue/renew the same SAN through the CA workflow, replace the
-external fullchain/key files, and reapply the reviewed Git configuration.
-A changed identity reloads Nginx; no manual Nginx configuration edit is needed.
+Set `BROWNROOK_PKI_DIR` to override the CA directory. Ansible verifies the
+certificate chain, hostname and matching private key. The proxy stores its
+copy under `/etc/nginx/tls/jupyter-arsene/` with root-only permissions.
+Private keys remain outside Git.
+
+For renewal, renew the existing wildcard through the established Brownrook CA
+workflow and reapply the playbook to each consumer. Certificate changes reload
+Nginx. The public route retains its separate Let's Encrypt certificate.
 
 Install the Brownrook root CA in each LAN/VPN client's browser/OS trust store.
 For a terminal-only check, without bypassing certificate validation:
 
 ```sh
-curl --cacert ~/brownrook-ca/root/root_ca.crt -I https://jupyter.arsene.brownrook.net/login
+curl --cacert ~/brownrook-ca/root/root_ca.crt -I https://jupyter.idc.brownrook.net/login
 ```
 
 Verify both addresses from LAN and VPN: sign in, start the Arsene PyTorch kernel,

@@ -8,7 +8,6 @@ on:
       - "ansible/**"
       - "runtime/jupyter/**"
       - "scripts/jupyter/**"
-      - "pki/jupyter-arsene/**"
       - "requirements-dev.txt"
       - "ansible.cfg"
       - ".ansible-lint"
@@ -19,7 +18,6 @@ on:
       - "ansible/**"
       - "runtime/jupyter/**"
       - "scripts/jupyter/**"
-      - "pki/jupyter-arsene/**"
       - "requirements-dev.txt"
       - "ansible.cfg"
       - ".ansible-lint"
@@ -53,12 +51,6 @@ jobs:
           uv lock --check --project runtime/jupyter/server
           uv lock --check --project runtime/jupyter/pytorch315
           python scripts/jupyter/validate_locks.py
-      - name: Validate internal Jupyter certificate request metadata
-        run: |
-          openssl req -new -newkey rsa:2048 -nodes \
-            -config pki/jupyter-arsene/jupyter-arsene.cnf \
-            -keyout /tmp/jupyter-test.key -out /tmp/jupyter-test.csr
-          openssl req -in /tmp/jupyter-test.csr -verify -noout
       - name: Install native configuration validators
         run: |
           sudo apt-get update

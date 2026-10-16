@@ -17,11 +17,11 @@ jupyter_certificate: /etc/letsencrypt/live/idc.brownrook.com/fullchain.pem
 jupyter_certificate_key: /etc/letsencrypt/live/idc.brownrook.com/privkey.pem
 
 # Internal alias uses the existing Brownrook CA, not the public wildcard.
-jupyter_internal_hostname: jupyter.arsene.brownrook.net
+jupyter_internal_hostname: jupyter.idc.brownrook.net
 jupyter_internal_allowed_sources: [192.168.2.0/24, 10.6.0.0/24]
 jupyter_pki_dir: "{{ lookup('ansible.builtin.env', 'BROWNROOK_PKI_DIR') | default(lookup('ansible.builtin.env', 'HOME') ~ '/brownrook-ca', true) }}"
-jupyter_internal_certificate_source: "{{ jupyter_pki_dir }}/leafs/jupyter-arsene/jupyter-arsene.fullchain.crt"
-jupyter_internal_key_source: "{{ jupyter_pki_dir }}/leafs/jupyter-arsene/jupyter-arsene.key"
+jupyter_internal_certificate_source: "{{ jupyter_pki_dir }}/leafs/k3ingress/k3ingress.fullchain.crt"
+jupyter_internal_key_source: "{{ jupyter_pki_dir }}/leafs/k3ingress/k3ingress.key"
 jupyter_internal_ca_source: "{{ jupyter_pki_dir }}/root/root_ca.crt"
 jupyter_internal_certificate: /etc/nginx/tls/jupyter-arsene/fullchain.crt
 jupyter_internal_key: /etc/nginx/tls/jupyter-arsene/privkey.pem

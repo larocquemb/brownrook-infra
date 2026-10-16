@@ -11,11 +11,14 @@
   register: jupyter_proxy_internal_identity
   no_log: true
 
-- name: Require the Brownrook CA leaf identity before deploying the internal alias
+- name: Require the existing Brownrook wildcard identity before deploying the internal alias
   ansible.builtin.assert:
     that:
       - item.stat.isreg | default(false)
-    fail_msg: Issue the jupyter-arsene identity under brownrook-ca/leafs with SAN jupyter.arsene.brownrook.net before applying. Keep private keys outside Git.
+    fail_msg: >-
+      Provide the existing k3ingress full chain and matching key under
+      brownrook-ca/leafs/k3ingress. The certificate must cover
+      jupyter.idc.brownrook.net. Keep private keys outside Git.
   loop: "{{ jupyter_proxy_internal_identity.results }}"
   no_log: true
 
