@@ -8,6 +8,16 @@
       - jupyter_home == '/home/' ~ jupyter_user
     fail_msg: This role supports the existing Arsene x86_64 Red Hat deployment.
 
+- name: Exclude unused Nouveau from future initramfs images
+  ansible.builtin.copy:
+    dest: /etc/dracut.conf.d/90-brownrook-no-nouveau.conf
+    content: |
+      # Managed by Ansible. Arsene uses the NVIDIA driver.
+      omit_drivers+=" nouveau "
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Read the existing Jupyter password configuration
   ansible.builtin.slurp:
     src: "{{ jupyter_home }}/.jupyter/jupyter_server_config.json"
