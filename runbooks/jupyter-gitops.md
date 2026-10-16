@@ -161,3 +161,13 @@ PyTorch CUDA operations and development Ollama share the RTX 3090 VRAM.
 Avoid simultaneous large loads; unload an idle Ollama model using
 `OLLAMA_HOST=http://192.168.2.201:11436 ollama stop MODEL` before a large CUDA
 notebook experiment. Production CPU Ollama on 11434 does not use GPU memory.
+
+## Arsene boot space
+
+Ansible excludes Nouveau from future initramfs builds through
+`/etc/dracut.conf.d/90-brownrook-no-nouveau.conf`. Arsene uses the NVIDIA
+driver; Nouveau is already blacklisted in the kernel command line.
+The tested kernel .66 image decreased from 179 MiB to 78 MiB and passed
+reboot, NVIDIA detection, and Ollama/Jupyter service recovery checks.
+This task does not rebuild existing images or restart services.
+The .62 fallback and standalone rescue image remain unchanged.
