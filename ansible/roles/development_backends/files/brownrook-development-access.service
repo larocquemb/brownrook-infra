@@ -1,0 +1,14 @@
+[Unit]
+Description=Restrict development backend ports to LAN and VPN
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=-/usr/sbin/nft delete table inet brownrook_development
+ExecStart=/usr/sbin/nft -f /etc/nftables-brownrook-development.nft
+ExecReload=/bin/sh -c '/usr/sbin/nft delete table inet brownrook_development; /usr/sbin/nft -f /etc/nftables-brownrook-development.nft'
+
+[Install]
+WantedBy=multi-user.target

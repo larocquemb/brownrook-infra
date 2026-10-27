@@ -1,0 +1,33 @@
+[Unit]
+Description=Isolated BrownRook development rabbitmq
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image={{ development_backends_rabbit_image }}
+ContainerName=brownrook-dev-rabbitmq
+Network=brownrook-dev.network
+HostName=brownrook-dev-rabbitmq
+PublishPort={{ development_backends_address }}:15673:5672
+PublishPort={{ development_backends_address }}:15674:15672
+Volume=brownrook-dev-rabbitmq.volume:/var/lib/rabbitmq
+Volume={{ development_backends_home }}/config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro,Z
+Volume={{ development_backends_home }}/config/rabbitmq-definitions.json:/etc/rabbitmq/definitions.json:ro,Z
+PodmanArgs=--memory=1g --memory-swap=1g --cpus=2 --pids-limit=2048
+HealthCmd=rabbitmq-diagnostics -q ping
+HealthInterval=15s
+HealthTimeout=5s
+HealthRetries=10
+HealthStartPeriod=60s
+HealthOnFailure=kill
+
+[Service]
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=900
+MemoryMax=1G
+MemorySwapMax=0
+CPUQuota=200%
+
+[Install]
+WantedBy=default.target

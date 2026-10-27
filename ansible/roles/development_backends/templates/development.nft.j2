@@ -1,0 +1,7 @@
+# Managed by Ansible; applies only to the new development ports.
+table inet brownrook_development {
+    chain input {
+        type filter hook input priority -20; policy accept;
+        ip daddr {{ development_backends_address }} tcp dport { 15432, 15673, 15674, 17687, 17474 } ip saddr != { {{ development_backends_sources | join(', ') }} } counter drop
+    }
+}

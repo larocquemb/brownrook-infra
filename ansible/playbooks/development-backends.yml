@@ -1,0 +1,9 @@
+---
+- name: Provision isolated Arsene development backends
+  hosts: jupyter_servers
+  become: true
+  gather_facts: true
+  vars_files:
+    - "{{ lookup('ansible.builtin.env', 'BROWNROOK_DEV_SECRETS_FILE') }}"
+  roles:
+    - role: development_backends
