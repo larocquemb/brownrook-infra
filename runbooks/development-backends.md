@@ -24,12 +24,13 @@ limits apply explicitly to containers as well as their service units.
 ## Provision
 
 Generate credentials in home-budget-pipeline with ledger development credentials.
-Keep the resulting .dev-backend/secrets.yml private and outside Git. Set
-BROWNROOK_DEV_SECRETS_FILE to its absolute path; no production secret is reused.
+Keep the resulting .dev-backend/secrets.yml private and outside Git. Provisioning
+defaults to `$HOME/Developer/home-budget-pipeline/.dev-backend/secrets.yml` on the
+Mac running Ansible. Set `BROWNROOK_DEV_SECRETS_FILE` only to override that location;
+the playbook fails if the selected file is missing. No production secret is reused.
 Review and merge both repositories' KAN-137 changes before applying.
 
 ```sh
-export BROWNROOK_DEV_SECRETS_FILE="$HOME/Developer/home-budget-pipeline/.dev-backend/secrets.yml"
 ansible-playbook --syntax-check ansible/playbooks/development-backends.yml
 ansible-lint ansible/playbooks/development-backends.yml
 ansible-playbook ansible/playbooks/development-backends.yml --check --diff --ask-become-pass

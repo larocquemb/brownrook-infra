@@ -3,16 +3,23 @@
   hosts: jupyter_servers
   become: true
   gather_facts: true
+  vars:
+    development_backends_secrets_file: >-
+      {{ lookup('ansible.builtin.env', 'BROWNROOK_DEV_SECRETS_FILE')
+         | default(lookup('ansible.builtin.env', 'HOME') ~ '/Developer/home-budget-pipeline/.dev-backend/secrets.yml', true) }}
   pre_tasks:
-    - name: Require the private development credential file at provisioning time
+    - name: Require the private development credential file on the controller
       ansible.builtin.assert:
         that:
-          - lookup('ansible.builtin.env', 'BROWNROOK_DEV_SECRETS_FILE') | length > 0
-        fail_msg: Set BROWNROOK_DEV_SECRETS_FILE to the private generated credentials.
+          - lookup('ansible.builtin.fileglob', development_backends_secrets_file, wantlist=true) | length == 1
+        fail_msg: >-
+          Missing private credentials at {{ development_backends_secrets_file }}.
+          Generate them with ledger development credentials, or set
+          BROWNROOK_DEV_SECRETS_FILE to an existing private credential file.
 
     - name: Load private development credentials
       ansible.builtin.include_vars:
-        file: "{{ lookup('ansible.builtin.env', 'BROWNROOK_DEV_SECRETS_FILE') }}"
+        file: "{{ development_backends_secrets_file }}"
       no_log: true
   roles:
     - role: development_backends
