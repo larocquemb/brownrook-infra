@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+# Only the fresh, isolated development volume runs this entrypoint script.
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres \
+  -v dev_password="$HOME_BUDGET_DEV_PASSWORD" -v test_password="$HOME_BUDGET_TEST_PASSWORD" <<'SQL'
+CREATE ROLE home_budget_dev LOGIN PASSWORD :'dev_password' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+CREATE ROLE home_budget_test LOGIN PASSWORD :'test_password' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+CREATE DATABASE home_budget_dev OWNER home_budget_dev;
+CREATE DATABASE home_budget_test OWNER home_budget_test;
+REVOKE CONNECT ON DATABASE home_budget_dev FROM PUBLIC;
+REVOKE CONNECT ON DATABASE home_budget_test FROM PUBLIC;
+GRANT CONNECT ON DATABASE home_budget_dev TO home_budget_dev;
+GRANT CONNECT ON DATABASE home_budget_test TO home_budget_test;
+ALTER DATABASE home_budget_dev SET home_budget.environment = 'development';
+ALTER DATABASE home_budget_test SET home_budget.environment = 'development';
+SQL

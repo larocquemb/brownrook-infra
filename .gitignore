@@ -32,6 +32,9 @@ kubernetes/helm/idc/*.secret.yaml
 .DS_Store
 **/.DS_Store
 
+# Generated validation artifacts.
+/.validation/
+
 # Python bytecode
 __pycache__/
 *.py[cod]

@@ -1,0 +1,204 @@
+---
+- name: Validate the development host and secrets before making changes
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname == 'arsene'
+      - ansible_facts['os_family'] == 'RedHat'
+      - development_backends_user == 'brownrook-dev'
+      - development_backends_home == '/home/brownrook-dev'
+      - development_backends_address == '192.168.2.201'
+      - dev_backend_secrets is defined
+      - dev_backend_secrets | length == 6
+    fail_msg: Use the generated private KAN-137 secrets and the dedicated Arsene configuration.
+  no_log: true
+
+- name: Require generated hexadecimal secrets without shell or SQL metacharacters
+  ansible.builtin.assert:
+    that:
+      - dev_backend_secrets[item] is match('^[0-9a-f]{64}$')
+  loop: [postgres_admin, postgres_dev, postgres_test, rabbit_dev, rabbit_test, neo4j]
+  no_log: true
+
+- name: Install rootless backend prerequisites
+  ansible.builtin.dnf:
+    name: [podman, passt, shadow-utils, nftables, dbus-daemon]
+    state: present
+    # This plugin prints notices before Ansible's JSON response. Disable it
+    # only for this prerequisite transaction, which installs no GPU/kernel RPMs.
+    disable_plugin:
+      - nvidia
+
+- name: Create the dedicated rootless backend account
+  ansible.builtin.user:
+    name: "{{ development_backends_user }}"
+    home: "{{ development_backends_home }}"
+    create_home: true
+    shell: /bin/bash
+    password_lock: true
+  register: development_backends_account
+
+- name: Read rootless subordinate ID mappings
+  ansible.builtin.slurp:
+    src: "{{ item }}"
+  loop: [/etc/subuid, /etc/subgid]
+  register: development_backends_subids
+
+- name: Require automatically allocated subordinate ID ranges
+  ansible.builtin.assert:
+    that:
+      - (item.content | b64decode) is search('(?m)^' ~ development_backends_user ~ ':[0-9]+:[0-9]+$')
+    fail_msg: Allocate nonoverlapping subordinate UID/GID ranges for brownrook-dev before starting Podman.
+  loop: "{{ development_backends_subids.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Enable rootless services to survive logout and start at boot
+  ansible.builtin.command:
+    argv: [loginctl, enable-linger, "{{ development_backends_user }}"]
+    creates: "/var/lib/systemd/linger/{{ development_backends_user }}"
+
+- name: Start the dedicated user service manager
+  ansible.builtin.systemd_service:
+    name: "user@{{ development_backends_account.uid }}.service"
+    state: started
+
+- name: Create private configuration directories
+  ansible.builtin.file:
+    path: "{{ development_backends_home }}/{{ item }}"
+    state: directory
+    owner: "{{ development_backends_user }}"
+    group: "{{ development_backends_user }}"
+    mode: "0700"
+  loop: [.ansible, .ansible/tmp, .config, .config/containers, .config/containers/systemd, config]
+
+- name: Install development port restrictions before starting containers
+  ansible.builtin.template:
+    src: development.nft.j2
+    dest: /etc/nftables-brownrook-development.nft
+    owner: root
+    group: root
+    mode: "0600"
+    validate: /usr/sbin/nft --check --file %s
+  notify: Restart development access restrictions
+
+- name: Install development access service
+  ansible.builtin.copy:
+    src: brownrook-development-access.service
+    dest: /etc/systemd/system/brownrook-development-access.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart development access restrictions
+
+- name: Apply access restrictions before exposing service ports
+  ansible.builtin.meta: flush_handlers
+
+- name: Keep development access restrictions active across reboot
+  ansible.builtin.systemd_service:
+    name: brownrook-development-access.service
+    daemon_reload: true
+    enabled: true
+    state: started
+
+- name: Create the dedicated user manager dependency directory
+  ansible.builtin.file:
+    path: "/etc/systemd/system/user@{{ development_backends_account.uid }}.service.d"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Order backend startup after host access restrictions
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/user@{{ development_backends_account.uid }}.service.d/development-access.conf"
+    content: |
+      [Unit]
+      Requires=brownrook-development-access.service
+      After=brownrook-development-access.service
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Reload system service dependencies
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+- name: Install private backend environment files
+  ansible.builtin.template:
+    src: "{{ item }}.env.j2"
+    dest: "{{ development_backends_home }}/config/{{ item }}.env"
+    owner: "{{ development_backends_user }}"
+    group: "{{ development_backends_user }}"
+    mode: "0600"
+  loop: [postgres, neo4j]
+  no_log: true
+  notify: Restart development backends
+
+- name: Install initial database roles and development identity markers
+  ansible.builtin.template:
+    src: postgres-init.sh.j2
+    dest: "{{ development_backends_home }}/config/postgres-init.sh"
+    owner: "{{ development_backends_user }}"
+    group: "{{ development_backends_user }}"
+    mode: "0755"
+  notify: Restart development backends
+
+- name: Install isolated broker identities and configuration
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ development_backends_home }}/config/{{ item }}"
+    owner: "{{ development_backends_user }}"
+    group: "{{ development_backends_user }}"
+    mode: "0644"
+  loop: [rabbitmq.conf, rabbitmq-definitions.json]
+  no_log: true
+  notify: Restart development backends
+
+- name: Install rootless development network
+  ansible.builtin.copy:
+    dest: "{{ development_backends_home }}/.config/containers/systemd/brownrook-dev.network"
+    content: |
+      [Network]
+      NetworkName=brownrook-dev
+    owner: "{{ development_backends_user }}"
+    group: "{{ development_backends_user }}"
+    mode: "0600"
+  notify: Restart development backends
+
+- name: Install persistent development volumes
+  ansible.builtin.copy:
+    dest: "{{ development_backends_home }}/.config/containers/systemd/brownrook-dev-{{ item }}.volume"
+    content: |
+      [Volume]
+      VolumeName=brownrook-dev-{{ item }}
+    owner: "{{ development_backends_user }}"
+    group: "{{ development_backends_user }}"
+    mode: "0600"
+  loop: "{{ development_backends_services }}"
+  notify: Restart development backends
+
+- name: Install development container Quadlets
+  ansible.builtin.template:
+    src: "{{ item }}.container.j2"
+    dest: "{{ development_backends_home }}/.config/containers/systemd/brownrook-dev-{{ item }}.container"
+    owner: "{{ development_backends_user }}"
+    group: "{{ development_backends_user }}"
+    mode: "0600"
+  loop: "{{ development_backends_services }}"
+  notify: Restart development backends
+
+- name: Apply development unit changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Start the rootless development services
+  become: true
+  become_user: "{{ development_backends_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ development_backends_account.uid }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ development_backends_account.uid }}/bus"
+  ansible.builtin.systemd_service:
+    scope: user
+    daemon_reload: true
+    name: "brownrook-dev-{{ item }}.service"
+    state: started
+  loop: "{{ development_backends_services }}"
