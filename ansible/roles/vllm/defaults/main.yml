@@ -3,7 +3,7 @@ vllm_binary: /usr/bin/podman
 vllm_user: paul
 vllm_home: /home/paul
 vllm_listen_address: "{{ ansible_host }}"
-vllm_port: 18000
+vllm_port: 8000
 vllm_allowed_sources:
   - 192.168.2.0/24
   - 10.42.0.0/16

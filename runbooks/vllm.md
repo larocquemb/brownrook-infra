@@ -13,7 +13,7 @@ it does not pull an image, download weights or store registry credentials.
 It uses the currently active `/run/user/<uid>` and does not enable user linger.
 A logged-in user session, or separately managed linger, is required.
 
-The service binds `192.168.2.201:18000`; its unauthenticated OpenAI-compatible
+The service binds `192.168.2.201:8000`; its unauthenticated OpenAI-compatible
 API is limited to the documented private networks by its own nftables table.
 That network is a trust boundary. Do not expose the port publicly. A test
 request and one short text response passed on the RTX 3090; image extraction,
@@ -59,8 +59,8 @@ Wait for the application startup message. Use Ctrl+C to stop following logs,
 then test from an approved host or from Arsene:
 
 ```sh
-curl -fsS http://192.168.2.201:18000/v1/models
-curl -fsS http://192.168.2.201:18000/v1/chat/completions \
+curl -fsS http://192.168.2.201:8000/v1/models
+curl -fsS http://192.168.2.201:8000/v1/chat/completions \
   -H 'Content-Type: application/json' \
   -d '{"model":"redhat-qwen","messages":[{"role":"user","content":"What is a receipt? Answer in one short sentence."}],"chat_template_kwargs":{"enable_thinking":false},"max_tokens":80,"temperature":0}'
 ```
