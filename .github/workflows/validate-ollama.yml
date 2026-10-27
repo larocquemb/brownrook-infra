@@ -1,0 +1,26 @@
+---
+name: Validate Ollama infrastructure
+on:
+  pull_request:
+    paths: ["ansible/**", "scripts/ollama/**", "tests/ollama/**", ".github/workflows/validate-ollama.yml"]
+  push:
+    branches: [main]
+    paths: ["ansible/**", "scripts/ollama/**", "tests/ollama/**", ".github/workflows/validate-ollama.yml"]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - run: python -m pip install -r requirements-dev.txt pytest
+      - run: ansible-lint ansible/playbooks/ollama.yml
+      - run: ansible-playbook --syntax-check ansible/playbooks/ollama.yml
+      - run: python -m pytest -q tests/ollama
+      - run: sudo apt-get update && sudo apt-get install -y nftables
+      - run: python scripts/ollama/render_host.py /tmp/ollama-rendered
+      - run: sudo nft --check --file /tmp/ollama-rendered/ollama-access.nft
+      - run: systemd-analyze verify /tmp/ollama-rendered/ollama.service /tmp/ollama-rendered/ollama-access.service

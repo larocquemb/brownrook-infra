@@ -1,0 +1,7 @@
+---
+- name: Configure the shared Arsene GPU Ollama service
+  hosts: ollama_hosts
+  become: true
+  gather_facts: true
+  roles:
+    - role: ollama
