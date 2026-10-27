@@ -34,3 +34,7 @@ kubernetes/helm/idc/*.secret.yaml
 
 # Generated validation artifacts.
 /.validation/
+
+# Python bytecode
+__pycache__/
+*.py[cod]

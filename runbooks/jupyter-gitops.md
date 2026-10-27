@@ -18,7 +18,7 @@ The existing Python 3.12 PyTorch venv and kernelspec are retained.
   PyTorch 2.14.1 CUDA 13.0, torchvision 0.29.1 and compatible mpmath 1.3.0.
 - Python 3.15.0 is installed by pinned uv 0.13.0 alongside the OS interpreter.
 - Jupyter and new kernels inherit `OLLAMA_HOST` and `OLLAMA_BASE_URL` pointing
-  to the managed Ollama service at `http://192.168.2.201:11436`. Set
+  to the managed Ollama service at `http://192.168.2.201:11434`. Set
   `jupyter_ollama_url` in the production group variables to change this endpoint.
   PyTorch execution is independent of these settings; code must explicitly
   call Ollama to use inference. Clients that hard-code an endpoint override them.
@@ -156,11 +156,11 @@ and run `scripts/jupyter/cuda_smoke.py` in a notebook. Kernel WebSocket access
 requires an authenticated browser test; the playbook's redirect probes do not
 prove it. Kernels execute on Arsene, not on the browser machine.
 
-Jupyter inherits the development GPU Ollama endpoint on port 11436. Notebook
-PyTorch CUDA operations and development Ollama share the RTX 3090 VRAM.
+Jupyter inherits the shared GPU Ollama endpoint on port 11434. Notebook
+PyTorch CUDA operations and shared Ollama use the RTX 3090 VRAM.
 Avoid simultaneous large loads; unload an idle Ollama model using
-`OLLAMA_HOST=http://192.168.2.201:11436 ollama stop MODEL` before a large CUDA
-notebook experiment. Production CPU Ollama on 11434 does not use GPU memory.
+`OLLAMA_HOST=http://192.168.2.201:11434 ollama stop MODEL` before a large CUDA
+notebook experiment. The shared Ollama service is GPU-backed.
 
 ## Arsene boot space
 

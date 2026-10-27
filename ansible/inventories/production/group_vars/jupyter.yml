@@ -5,7 +5,7 @@ jupyter_home: /home/paul
 jupyter_hostname: jupyter.idc.brownrook.com
 jupyter_backend_ip: 192.168.2.201
 jupyter_backend_port: 8888
-jupyter_ollama_url: http://192.168.2.201:11436
+jupyter_ollama_url: http://192.168.2.201:11434
 jupyter_proxy_ip: 192.168.2.210
 jupyter_notebooks_dir: /home/paul/notebooks
 jupyter_uv_version: 0.13.0
