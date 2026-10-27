@@ -80,6 +80,24 @@ The application guide includes pgAdmin/psql profiles, schema bootstrap/reset and
 representative graph replay. Work MacBook validation depends on actual device
 policies and must be recorded; it is not assumed from M4 Pro results.
 
+## Idempotence and restart acceptance
+
+After provisioning, reconcile twice and then restart only the dedicated
+`brownrook-dev-*` services, using one interactive sudo prompt:
+
+```sh
+ansible-playbook ansible/playbooks/development-backends.yml \
+  ansible/playbooks/development-backends.yml \
+  ansible/playbooks/validate-development-backends.yml --ask-become-pass
+```
+
+The second provisioning pass should report no unintended changes. The validation
+playbook checks all container health statuses, restarts the three dedicated
+user services, then waits for healthy status again. It never restarts K3s,
+production services, or the host. Check database identities, receipt/category
+counts and graph snapshot counts from the Mac afterward to verify persistence.
+A host reboot remains a separate check requiring an approved maintenance window.
+
 ## Backup, restore and rollback
 
 Use pg_dump/pg_restore for the development databases and preserve role/marker

@@ -1,0 +1,57 @@
+---
+- name: Validate isolated Arsene backend restart and health
+  hosts: jupyter_servers
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Limit restart validation to Arsene development services
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname == 'arsene'
+
+    - name: Read the dedicated development service account
+      ansible.builtin.getent:
+        database: passwd
+        key: brownrook-dev
+
+    - name: Verify backend health before restart
+      become: true
+      become_user: brownrook-dev
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.getent_passwd['brownrook-dev'][1] }}"
+        DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ ansible_facts.getent_passwd['brownrook-dev'][1] }}/bus"
+      ansible.builtin.command:
+        argv: [podman, inspect, --format, "{{ '{{.State.Health.Status}}' }}", "brownrook-dev-{{ item }}"]
+      changed_when: false
+      register: development_health_before
+      until: development_health_before.stdout | trim == 'healthy'
+      retries: 30
+      delay: 2
+      loop: [postgres, rabbitmq, neo4j]
+
+    - name: Restart only the three dedicated development backends
+      become: true
+      become_user: brownrook-dev
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.getent_passwd['brownrook-dev'][1] }}"
+        DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ ansible_facts.getent_passwd['brownrook-dev'][1] }}/bus"
+      ansible.builtin.systemd_service:
+        scope: user
+        name: "brownrook-dev-{{ item }}.service"
+        state: restarted
+      loop: [postgres, rabbitmq, neo4j]
+
+    - name: Verify backend health after restart
+      become: true
+      become_user: brownrook-dev
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.getent_passwd['brownrook-dev'][1] }}"
+        DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ ansible_facts.getent_passwd['brownrook-dev'][1] }}/bus"
+      ansible.builtin.command:
+        argv: [podman, inspect, --format, "{{ '{{.State.Health.Status}}' }}", "brownrook-dev-{{ item }}"]
+      changed_when: false
+      register: development_health_after
+      until: development_health_after.stdout | trim == 'healthy'
+      retries: 60
+      delay: 2
+      loop: [postgres, rabbitmq, neo4j]

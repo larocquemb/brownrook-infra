@@ -2,10 +2,10 @@
 name: Validate development Podman backends
 on:
   pull_request:
-    paths: ["ansible/roles/development_backends/**", "ansible/playbooks/development-backends.yml", "scripts/development/**", ".github/workflows/validate-development-backends.yml"]
+    paths: ["ansible/roles/development_backends/**", "ansible/playbooks/development-backends.yml", "ansible/playbooks/validate-development-backends.yml", "scripts/development/**", ".github/workflows/validate-development-backends.yml"]
   push:
     branches: [main]
-    paths: ["ansible/roles/development_backends/**", "ansible/playbooks/development-backends.yml", "scripts/development/**", ".github/workflows/validate-development-backends.yml"]
+    paths: ["ansible/roles/development_backends/**", "ansible/playbooks/development-backends.yml", "ansible/playbooks/validate-development-backends.yml", "scripts/development/**", ".github/workflows/validate-development-backends.yml"]
 permissions:
   contents: read
 jobs:
@@ -26,7 +26,9 @@ jobs:
           BROWNROOK_DEV_SECRETS_FILE: "${{ github.workspace }}/.validation/development/synthetic-secrets.yml"
         run: |
           ansible-playbook --syntax-check ansible/playbooks/development-backends.yml
+          ansible-playbook --syntax-check ansible/playbooks/validate-development-backends.yml
           ansible-lint ansible/playbooks/development-backends.yml
+          ansible-lint ansible/playbooks/validate-development-backends.yml
       - name: Validate Quadlets with Podman
         run: |
           sudo apt-get update
