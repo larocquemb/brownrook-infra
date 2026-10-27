@@ -3,7 +3,16 @@
   hosts: jupyter_servers
   become: true
   gather_facts: true
-  vars_files:
-    - "{{ lookup('ansible.builtin.env', 'BROWNROOK_DEV_SECRETS_FILE') }}"
+  pre_tasks:
+    - name: Require the private development credential file at provisioning time
+      ansible.builtin.assert:
+        that:
+          - lookup('ansible.builtin.env', 'BROWNROOK_DEV_SECRETS_FILE') | length > 0
+        fail_msg: Set BROWNROOK_DEV_SECRETS_FILE to the private generated credentials.
+
+    - name: Load private development credentials
+      ansible.builtin.include_vars:
+        file: "{{ lookup('ansible.builtin.env', 'BROWNROOK_DEV_SECRETS_FILE') }}"
+      no_log: true
   roles:
     - role: development_backends
