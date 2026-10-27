@@ -1,0 +1,18 @@
+---
+vllm_binary: /usr/bin/podman
+vllm_user: paul
+vllm_home: /home/paul
+vllm_listen_address: "{{ ansible_host }}"
+vllm_port: 18000
+vllm_allowed_sources:
+  - 192.168.2.0/24
+  - 10.42.0.0/16
+  - 10.6.0.0/24
+vllm_model_id: RedHatAI/Qwen3.8-27B-INT4
+vllm_model_directory: models--RedHatAI--Qwen3.8-27B-INT4
+vllm_model_revision: 91bd022d5b49442a868bc35008f6c21e1860edfa
+vllm_image: registry.redhat.io/rhaii/vllm-cuda-rhel9@sha256:5d4434598dc702b89c8d63b9fa6e2378130abf649c95f4211fb93e325cfd7698
+vllm_served_name: redhat-qwen
+vllm_context_length: 2048
+vllm_gpu_memory_utilization: 0.90
+vllm_minimum_free_mib: 22000

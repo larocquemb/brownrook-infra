@@ -1,0 +1,136 @@
+---
+- name: Validate the dedicated host and private vLLM configuration
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname == 'arsene'
+      - vllm_listen_address == ansible_host
+      - vllm_allowed_sources | length > 0
+      - vllm_port | int > 1024
+      - vllm_port | int < 65536
+      - vllm_model_revision is match('^[0-9a-f]{40}$')
+      - vllm_model_directory is match('^[A-Za-z0-9_.-]+$')
+      - vllm_home is match('^/[A-Za-z0-9_./-]+$')
+      - vllm_binary is match('^/[A-Za-z0-9_./-]+$')
+      - vllm_user is match('^[a-z_][a-z0-9_-]*$')
+    fail_msg: Configure the expected Arsene user, private interface, and pinned model inputs.
+
+- name: Read the vLLM service account
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ vllm_user }}"
+
+- name: Derive the rootless Podman user ID
+  ansible.builtin.set_fact:
+    vllm_uid: "{{ ansible_facts.getent_passwd[vllm_user][1] }}"
+
+- name: Confirm the configured home belongs to the service account
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.getent_passwd[vllm_user][4] == vllm_home
+      - vllm_uid | int > 0
+    fail_msg: Set vllm_home and vllm_user to the existing rootless Podman account.
+
+- name: Check the pinned local model configuration
+  ansible.builtin.stat:
+    path: "{{ vllm_home }}/.cache/huggingface/hub/{{ vllm_model_directory }}/snapshots/{{ vllm_model_revision }}/config.json"
+    follow: true
+  register: vllm_model_config
+
+- name: Check the rootless runtime directory
+  ansible.builtin.stat:
+    path: "/run/user/{{ vllm_uid }}"
+  register: vllm_runtime
+
+- name: Require the pinned model and active user runtime
+  ansible.builtin.assert:
+    that:
+      - vllm_model_config.stat.isreg | default(false)
+      - vllm_runtime.stat.isdir | default(false)
+    fail_msg: The pinned model or user runtime is unavailable; check the runbook before applying.
+
+- name: Check the pinned image in the service user's Podman store
+  become: true
+  become_user: "{{ vllm_user }}"
+  environment:
+    HOME: "{{ vllm_home }}"
+    XDG_RUNTIME_DIR: "/run/user/{{ vllm_uid }}"
+  ansible.builtin.command:
+    argv: [podman, image, exists, "{{ vllm_image }}"]
+  register: vllm_image_present
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Require the pinned Red Hat image to be present
+  ansible.builtin.assert:
+    that:
+      - vllm_image_present.rc == 0
+    fail_msg: Pull the pinned vLLM image as the service user before applying; see the runbook.
+
+- name: Create the vLLM firewall directory
+  ansible.builtin.file:
+    path: /etc/nftables
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the validated private vLLM firewall
+  ansible.builtin.template:
+    src: vllm-access.nft.j2
+    dest: /etc/nftables/vllm-access.nft
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/nft --check --file %s
+  notify: Restart vLLM access
+
+- name: Install the private vLLM firewall service
+  ansible.builtin.copy:
+    src: vllm-access.service
+    dest: /etc/systemd/system/vllm-access.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart vLLM access
+
+- name: Ensure the host helper directory exists
+  ansible.builtin.file:
+    path: /usr/local/libexec
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the GPU memory preflight
+  ansible.builtin.copy:
+    src: vllm-gpu-preflight.py
+    dest: /usr/local/libexec/vllm-gpu-preflight.py
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the optional vLLM service
+  ansible.builtin.template:
+    src: vllm.service.j2
+    dest: /etc/systemd/system/brownrook-vllm.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd for vLLM
+
+- name: Apply firewall and unit changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Keep vLLM disabled at boot
+  ansible.builtin.systemd_service:
+    name: brownrook-vllm.service
+    daemon_reload: true
+    enabled: false
+  when: not ansible_check_mode
+
+- name: Report manual startup and shared-GPU behavior
+  ansible.builtin.debug:
+    msg: >-
+      Provisioned only. Starting brownrook-vllm stops ollama.service due to the
+      systemd conflict. After testing, stop brownrook-vllm and start ollama.service.

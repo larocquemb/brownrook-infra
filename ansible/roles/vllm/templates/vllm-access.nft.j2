@@ -1,0 +1,13 @@
+# A separate table preserves other host and Kubernetes firewall rules.
+add table inet vllm_access
+flush table inet vllm_access
+table inet vllm_access {
+    chain input {
+        type filter hook input priority -10; policy accept;
+        iifname "lo" tcp dport {{ vllm_port }} accept
+{% for source in vllm_allowed_sources %}
+        ip saddr {{ source }} tcp dport {{ vllm_port }} accept
+{% endfor %}
+        tcp dport {{ vllm_port }} reject with tcp reset
+    }
+}

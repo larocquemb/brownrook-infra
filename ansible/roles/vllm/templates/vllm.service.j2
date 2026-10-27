@@ -1,0 +1,21 @@
+# Managed by brownrook-infra Ansible. This service is deliberately not enabled at boot.
+[Unit]
+Description=Optional Red Hat vLLM shared-GPU inference
+Requires=vllm-access.service
+After=network-online.target vllm-access.service
+Conflicts=ollama.service
+
+[Service]
+Type=simple
+User={{ vllm_user }}
+Environment="HOME={{ vllm_home }}"
+Environment="XDG_RUNTIME_DIR=/run/user/{{ vllm_uid }}"
+ExecStartPre=/usr/bin/python3 /usr/local/libexec/vllm-gpu-preflight.py {{ vllm_minimum_free_mib }}
+ExecStart={{ vllm_binary }} run --rm --name brownrook-vllm --pull=never --device nvidia.com/gpu=all --security-opt label=disable --userns keep-id --shm-size 1g --publish {{ vllm_listen_address }}:{{ vllm_port }}:8000 --volume {{ vllm_home }}/.cache/huggingface/hub:/hfhub:ro --env HF_HUB_OFFLINE=1 --env TRANSFORMERS_OFFLINE=1 {{ vllm_image }} --model /hfhub/{{ vllm_model_directory }}/snapshots/{{ vllm_model_revision }} --served-model-name {{ vllm_served_name }} --dtype bfloat16 --max-model-len {{ vllm_context_length }} --max-num-seqs 1 --gpu-memory-utilization {{ vllm_gpu_memory_utilization }} --enforce-eager
+ExecStop={{ vllm_binary }} stop --time 30 brownrook-vllm
+TimeoutStopSec=45
+Restart=no
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
