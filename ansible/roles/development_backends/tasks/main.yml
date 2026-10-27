@@ -20,9 +20,13 @@
   no_log: true
 
 - name: Install rootless backend prerequisites
-  ansible.builtin.package:
+  ansible.builtin.dnf:
     name: [podman, passt, shadow-utils, nftables, dbus-daemon]
     state: present
+    # This plugin prints notices before Ansible's JSON response. Disable it
+    # only for this prerequisite transaction, which installs no GPU/kernel RPMs.
+    disable_plugin:
+      - nvidia
 
 - name: Create the dedicated rootless backend account
   ansible.builtin.user:

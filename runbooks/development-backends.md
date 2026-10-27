@@ -42,6 +42,11 @@ Ansible output. If the production-matching GHCR PostgreSQL image requires regist
 login, authenticate the dedicated account with a read-only package credential
 through the approved secret workflow, then retry; do not copy production tokens.
 
+The prerequisite DNF transaction disables the `nvidia` plugin for that operation
+only. Its stdout notices otherwise corrupt Ansible's JSON response, even when
+all prerequisites are already installed. No global plugin settings, driver or
+kernel packages are changed by this task.
+
 PostgreSQL uses the production image (including its installed OIDC validator)
 but development clients use separate SCRAM roles, not production Entra DB tokens.
 Its first-volume initialization creates home_budget_dev and home_budget_test,
