@@ -58,12 +58,15 @@ server_count=$(kubectl --context "${context}" get nodes \
   && pass "exactly three control-plane servers are registered" \
   || fail "expected three control-plane servers; found ${server_count}"
 
-local_path_claims=$(kubectl --context "${context}" get pvc -A \
-  -o jsonpath='{range .items[?(@.spec.storageClassName=="local-path")]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}')
-if [[ -n ${local_path_claims} ]]; then
-  fail "PVCs still use local-path: $(tr '\n' ' ' <<<"${local_path_claims}")"
+if local_path_claims=$(kubectl --context "${context}" get pvc -A \
+  -o jsonpath='{range .items[?(@.spec.storageClassName=="local-path")]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}'); then
+  if [[ -z ${local_path_claims} ]]; then
+    pass "no PVC uses local-path"
+  else
+    fail "PVCs still use local-path: $(tr '\n' ' ' <<<"${local_path_claims}")"
+  fi
 else
-  pass "no PVC uses local-path"
+  fail "cannot inspect PVCs; storage migration is unverified"
 fi
 
 if ! ${check_longhorn}; then
@@ -77,7 +80,7 @@ else
       || fail "${node} lacks node.longhorn.io/create-default-disk=true"
 
     if ssh -o BatchMode=yes -o ConnectTimeout=5 "${node}" \
-      "sudo -n findmnt -n -o FSTYPE --target /var/lib/longhorn 2>/dev/null" \
+      "sudo -n findmnt -n -o FSTYPE --mountpoint /var/lib/longhorn 2>/dev/null" \
       | grep -Eq '^(xfs|ext4)$'; then
       pass "${node} has XFS/ext4 mounted at /var/lib/longhorn"
     else

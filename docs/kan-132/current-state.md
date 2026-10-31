@@ -68,3 +68,23 @@ queue rather than durable application storage.
 Do not run a node-failure exercise yet. Losing `k3s1` currently loses both the
 control plane and production `local-path` state. Complete the backup, quorum,
 storage, and restore gates first.
+
+## October 31, 2026 review update
+
+The September audit above is retained as the historical baseline. All three
+nodes are now joined and Ready; `arsene` and `longbow` remain agents. The cluster
+still has one control-plane server and local-path production volumes.
+
+Storage capacity repair expanded VM300's existing SSD-backed data disk to
+120 GiB and moved Arsene's Neo4j local-path data to the larger local NVMe
+filesystem through a persistent bind mount. These repairs do not provide
+replication or dedicated Longhorn storage. The database and graph recovered,
+but HA conversion, offsite backup validation and failure drills remain pending.
+
+Backup files are confidential, including the SQLite datastore and K3s config,
+which can contain credentials. The backup helper now uses private directories
+and files, verifies SQLite consistency and hashes, never overwrites a prior
+backup, and refuses a stale SQLite backup after detected etcd/external-datastore
+configuration. Read-only validation fails closed if PVC or Longhorn APIs cannot
+be inspected, or if no Longhorn volumes exist. Its metadata checks do not
+replace the application restore and controlled node-failure drills.

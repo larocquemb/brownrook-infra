@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -uo pipefail
+umask 077
 
 context=${KUBECTL_CONTEXT:-brownrook-k3s1}
-evidence_dir=${EVIDENCE_DIR:-evidence/kan-132}
+evidence_dir=${EVIDENCE_DIR:-.validation/kan-132}
 timestamp=$(date -u +%Y%m%dT%H%M%SZ)
-report="${evidence_dir}/${timestamp}-ha-validation.txt"
 failures=0
 
 mkdir -p "${evidence_dir}"
+report=$(mktemp "${evidence_dir}/${timestamp}-ha-validation.XXXXXX")
 exec > >(tee "${report}") 2>&1
 
 pass() { printf 'PASS  %s\n' "$*"; }
@@ -21,10 +22,12 @@ if ! kubectl --context "${context}" get nodes -o wide; then
   exit 1
 fi
 
-ready_servers=$(kubectl --context "${context}" get nodes \
-  -l node-role.kubernetes.io/control-plane \
-  -o jsonpath='{range .items[?(@.status.conditions[?(@.type=="Ready")].status=="True")]}{.metadata.name}{"\n"}{end}' \
-  | wc -l | tr -d ' ')
+if nodes_json=$(kubectl --context "${context}" get nodes -l node-role.kubernetes.io/control-plane -o json); then
+  ready_servers=$(python3 -c 'import json,sys; print(sum(any(c.get("type")=="Ready" and c.get("status")=="True" for c in n.get("status",{}).get("conditions",[])) for n in json.load(sys.stdin)["items"]))' <<<"${nodes_json}")
+else
+  ready_servers=0
+  fail "cannot inspect control-plane readiness"
+fi
 [[ ${ready_servers} -ge 2 ]] \
   && pass "at least two control-plane servers are Ready (${ready_servers})" \
   || fail "fewer than two control-plane servers are Ready (${ready_servers})"
@@ -42,18 +45,25 @@ else
   fail "brownrook-block-rwo is absent or not backed by Longhorn"
 fi
 
-local_path_claims=$(kubectl --context "${context}" get pvc -A \
-  -o jsonpath='{range .items[?(@.spec.storageClassName=="local-path")]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}')
-[[ -z ${local_path_claims} ]] \
-  && pass "no PVC uses local-path" \
-  || fail "PVCs still use local-path: $(tr '\n' ' ' <<<"${local_path_claims}")"
-
-if kubectl --context "${context}" -n longhorn-system get volumes.longhorn.io \
-    -o jsonpath='{range .items[?(@.status.robustness!="healthy")]}{.metadata.name}{"="}{.status.robustness}{"\n"}{end}' \
-    2>/dev/null | grep -q .; then
-  fail "one or more Longhorn volumes are not healthy"
+if local_path_claims=$(kubectl --context "${context}" get pvc -A \
+  -o jsonpath='{range .items[?(@.spec.storageClassName=="local-path")]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}'); then
+  if [[ -z ${local_path_claims} ]]; then
+    pass "no PVC uses local-path"
+  else
+    fail "PVCs still use local-path: $(tr '\n' ' ' <<<"${local_path_claims}")"
+  fi
 else
-  pass "all reported Longhorn volumes are healthy"
+  fail "cannot inspect PVCs; storage migration is unverified"
+fi
+
+if volumes_json=$(kubectl --context "${context}" -n longhorn-system get volumes.longhorn.io -o json); then
+  if python3 -c 'import json,sys; v=json.load(sys.stdin)["items"]; sys.exit(0 if v and all(x.get("status",{}).get("robustness")=="healthy" for x in v) else 1)' <<<"${volumes_json}"; then
+    pass "reported Longhorn volumes exist and are healthy"
+  else
+    fail "Longhorn volumes are absent, unhealthy, or unreadable"
+  fi
+else
+  fail "cannot inspect Longhorn volumes; resilience is unverified"
 fi
 
 coredns_available=$(kubectl --context "${context}" -n kube-system get deployment coredns \

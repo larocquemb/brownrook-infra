@@ -6,6 +6,8 @@ on:
       - ".github/workflows/validate-kan-132.yml"
       - "docs/kan-132/**"
       - "scripts/kan-132/**"
+      - "tests/kan132/**"
+      - "Makefile"
       - "kubernetes/staged/**"
   push:
     branches:
@@ -14,6 +16,8 @@ on:
       - ".github/workflows/validate-kan-132.yml"
       - "docs/kan-132/**"
       - "scripts/kan-132/**"
+      - "tests/kan132/**"
+      - "Makefile"
       - "kubernetes/staged/**"
 
 permissions:
@@ -27,8 +31,15 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v5
 
-      - name: Validate shell syntax
-        run: bash -n scripts/kan-132/*.sh
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install validation tools
+        run: python -m pip install pytest
+      - name: Validate scripts and read-only API failure cases
+        run: make ha-check
+      - name: Exercise the root-only backup against isolated synthetic files
+        run: sudo "$(command -v python)" -m pytest -q tests/kan132/test_sqlite_backup.py
 
       - name: Reject unresolved conflict markers and committed credentials
         run: |
