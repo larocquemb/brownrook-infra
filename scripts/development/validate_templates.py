@@ -2,6 +2,7 @@
 """Render development contracts with synthetic secrets, never live credentials."""
 from pathlib import Path
 import json
+import re
 import sys
 import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
@@ -10,7 +11,7 @@ root = Path(__file__).resolve().parents[2]
 role = root / 'ansible/roles/development_backends'
 values = yaml.safe_load((role / 'defaults/main.yml').read_text())
 values['dev_backend_secrets'] = {k: '1' * 64 for k in
-    ('postgres_admin','postgres_dev','postgres_test','rabbit_dev','rabbit_test','neo4j')}
+    ('postgres_admin','postgres_dev','rabbit_dev','rabbit_test','neo4j')}
 env = Environment(loader=FileSystemLoader(role / 'templates'), undefined=StrictUndefined)
 env.filters['to_json'] = json.dumps
 out = Path(sys.argv[1])
@@ -19,6 +20,12 @@ for source in sorted((role / 'templates').glob('*.j2')):
     rendered = env.get_template(source.name).render(**values)
     assert '{{' not in rendered
     (out / source.name.removesuffix('.j2')).write_text(rendered)
+# A fresh volume must create only the agreed development database, and must
+# not need a retired test credential to render or provision.
+bootstrap = (out / 'postgres-init.sh').read_text()
+assert re.findall(r'^CREATE DATABASE ([a-z_]+)', bootstrap, re.M) == ['home_budget_dev']
+assert re.findall(r'^CREATE ROLE ([a-z_]+)', bootstrap, re.M) == ['home_budget_dev']
+assert 'HOME_BUDGET_TEST_PASSWORD' not in (out / 'postgres.env').read_text()
 definitions = json.loads((out / 'rabbitmq-definitions.json').read_text())
 assert {v['name'] for v in definitions['vhosts']} == {'home-budget-dev','home-budget-test'}
 assert len(definitions['permissions']) == 2
