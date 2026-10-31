@@ -50,9 +50,12 @@ kernel packages are changed by this task.
 
 PostgreSQL uses the production image (including its installed OIDC validator)
 but development clients use separate SCRAM roles, not production Entra DB tokens.
-Its first-volume initialization creates home_budget_dev and home_budget_test,
-owned by matching non-superuser roles, denies PUBLIC database connections, and
-sets home_budget.environment=development. Application schema bootstrap is a
+Its first-volume initialization creates only `home_budget_dev`, owned by its
+matching non-superuser role, denies PUBLIC database connections, and sets
+`home_budget.environment=development`. The separate PostgreSQL test database
+is retired. Legacy private credential files may retain an unused `postgres_test`
+key; provisioning no longer requires or exports it. Updating the init script
+does not delete databases or rebuild existing volumes. Application schema bootstrap is a
 separate explicit command from the current pipeline checkout. Init scripts and
 POSTGRES_PASSWORD do not rotate existing database passwords. Preserve the private
 credentials file; use a separately reviewed rotation procedure if it changes.
@@ -70,7 +73,8 @@ sudo journalctl --user-unit=brownrook-dev-postgres -n 50
 
 Use the pipeline's `ledger development configure --apply` and
 `ledger --env-file .env.dev development check` after
-services are healthy. Test negative access between dev/test roles and vhosts,
+services are healthy. Test rejection of production database access and
+cross-vhost broker access,
 repeat Ansible apply (changed=0 expected), restart services, and test an approved
 host reboot. Verify the Mac's native web application through existing local
 Colima HTTPS/Entra, including forged identity-header rejection. Record container
