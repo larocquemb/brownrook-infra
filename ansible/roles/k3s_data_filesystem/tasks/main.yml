@@ -1,0 +1,56 @@
+---
+- name: Inspect the active data filesystem
+  ansible.builtin.command: findmnt -n -o SOURCE,FSTYPE --target {{ k3s_data_filesystem_mount }}
+  register: k3s_data_filesystem_current
+  changed_when: false
+  check_mode: false
+
+- name: Verify the expected mounted XFS data partition
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname == 'k3s1'
+      - k3s_data_filesystem_current.stdout.split() == [k3s_data_filesystem_partition, 'xfs']
+      - k3s_data_filesystem_disk == '/dev/sda'
+      - k3s_data_filesystem_partition == '/dev/sda1'
+      - k3s_data_filesystem_mount == '/build'
+
+- name: Rescan the expanded virtual disk
+  ansible.builtin.command:
+    argv: [tee, /sys/class/block/sda/device/rescan]
+    stdin: '1'
+  changed_when: false
+
+- name: Inspect disk and partition capacity
+  ansible.builtin.command: lsblk -b -J -o NAME,SIZE {{ k3s_data_filesystem_disk }}
+  register: k3s_data_filesystem_sizes
+  changed_when: false
+  check_mode: false
+
+- name: Require the expanded block device before resizing the partition
+  ansible.builtin.assert:
+    that:
+      - (k3s_data_filesystem_sizes.stdout | from_json).blockdevices[0].size | int >= k3s_data_filesystem_target_gib | int * 1073741824
+  when: not ansible_check_mode
+
+- name: Extend the existing partition in place
+  ansible.builtin.command: growpart {{ k3s_data_filesystem_disk }} 1
+  register: k3s_data_filesystem_growpart
+  changed_when: "'CHANGED:' in k3s_data_filesystem_growpart.stdout"
+  failed_when: >-
+    k3s_data_filesystem_growpart.rc not in [0, 1] or
+    (k3s_data_filesystem_growpart.rc == 1 and 'NOCHANGE:' not in k3s_data_filesystem_growpart.stdout)
+
+- name: Inspect current filesystem capacity
+  ansible.builtin.command: df -B1 --output=size {{ k3s_data_filesystem_mount }}
+  register: k3s_data_filesystem_capacity
+  changed_when: false
+  check_mode: false
+
+- name: Grow XFS online when below the target capacity
+  ansible.builtin.command: xfs_growfs {{ k3s_data_filesystem_mount }}
+  when: k3s_data_filesystem_capacity.stdout_lines[-1] | trim | int < (k3s_data_filesystem_target_gib | int * 1073741824 - 1073741824)
+  changed_when: true
+
+- name: Read back data filesystem capacity
+  ansible.builtin.command: df -h {{ k3s_data_filesystem_mount }}
+  changed_when: false

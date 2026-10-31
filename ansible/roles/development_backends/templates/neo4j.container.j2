@@ -1,0 +1,31 @@
+[Unit]
+Description=Isolated BrownRook development neo4j
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image={{ development_backends_neo4j_image }}
+ContainerName=brownrook-dev-neo4j
+Network=brownrook-dev.network
+PublishPort={{ development_backends_address }}:17687:7687
+PublishPort={{ development_backends_address }}:17474:7474
+Volume=brownrook-dev-neo4j.volume:/data
+EnvironmentFile={{ development_backends_home }}/config/neo4j.env
+PodmanArgs=--memory=6g --memory-swap=6g --cpus=2 --pids-limit=2048
+HealthCmd=wget -q --spider http://localhost:7474
+HealthInterval=15s
+HealthTimeout=5s
+HealthRetries=10
+HealthStartPeriod=60s
+HealthOnFailure=kill
+
+[Service]
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=900
+MemoryMax=6G
+MemorySwapMax=0
+CPUQuota=200%
+
+[Install]
+WantedBy=default.target

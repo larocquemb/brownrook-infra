@@ -1,0 +1,31 @@
+[Unit]
+Description=Isolated BrownRook development postgres
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image={{ development_backends_postgres_image }}
+ContainerName=brownrook-dev-postgres
+Network=brownrook-dev.network
+PublishPort={{ development_backends_address }}:15432:5432
+Volume=brownrook-dev-postgres.volume:/var/lib/postgresql
+EnvironmentFile={{ development_backends_home }}/config/postgres.env
+Volume={{ development_backends_home }}/config/postgres-init.sh:/docker-entrypoint-initdb.d/010-development.sh:ro,Z
+PodmanArgs=--memory=2g --memory-swap=2g --cpus=2 --pids-limit=2048
+HealthCmd=pg_isready -U development_admin -d postgres
+HealthInterval=15s
+HealthTimeout=5s
+HealthRetries=10
+HealthStartPeriod=60s
+HealthOnFailure=kill
+
+[Service]
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=900
+MemoryMax=2G
+MemorySwapMax=0
+CPUQuota=200%
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,11 @@
+{
+  "users": [
+    {"name":"home_budget_dev","password":{{ dev_backend_secrets.rabbit_dev | to_json }},"tags":"management"},
+    {"name":"home_budget_test","password":{{ dev_backend_secrets.rabbit_test | to_json }},"tags":""}
+  ],
+  "vhosts": [{"name":"home-budget-dev"},{"name":"home-budget-test"}],
+  "permissions": [
+    {"user":"home_budget_dev","vhost":"home-budget-dev","configure":".*","write":".*","read":".*"},
+    {"user":"home_budget_test","vhost":"home-budget-test","configure":".*","write":".*","read":".*"}
+  ]
+}

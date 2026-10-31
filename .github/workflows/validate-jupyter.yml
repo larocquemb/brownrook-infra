@@ -1,0 +1,67 @@
+---
+name: Validate Jupyter infrastructure
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/validate-jupyter.yml"
+      - "ansible/**"
+      - "runtime/jupyter/**"
+      - "scripts/jupyter/**"
+      - "requirements-dev.txt"
+      - "ansible.cfg"
+      - ".ansible-lint"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-jupyter.yml"
+      - "ansible/**"
+      - "runtime/jupyter/**"
+      - "scripts/jupyter/**"
+      - "requirements-dev.txt"
+      - "ansible.cfg"
+      - ".ansible-lint"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ANSIBLE_LOCAL_TEMP: /tmp/ansible-local
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Install pinned validation tools
+        run: python -m pip install -r requirements-dev.txt uv==0.13.0
+      - name: Validate Ansible and inventory
+        run: |
+          mkdir -p "$ANSIBLE_LOCAL_TEMP"
+          ansible-lint ansible/playbooks/jupyter.yml
+          ansible-playbook --syntax-check ansible/playbooks/jupyter.yml
+          ansible-inventory --graph jupyter
+      - name: Check committed lockfiles and runtime contracts
+        run: |
+          uv lock --check --project runtime/jupyter/server
+          uv lock --check --project runtime/jupyter/pytorch315
+          python scripts/jupyter/validate_locks.py
+      - name: Install native configuration validators
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nginx unbound nftables
+      - name: Validate rendered Nginx, Unbound, firewall and kernel configuration
+        run: |
+          python scripts/jupyter/render_templates.py /tmp/jupyter-rendered
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -subj /CN=jupyter.idc.brownrook.com \
+            -keyout /tmp/jupyter-rendered/test-key.pem \
+            -out /tmp/jupyter-rendered/test-cert.pem
+          sudo nginx -t -c /tmp/jupyter-rendered/nginx.conf
+          sudo unbound-checkconf /tmp/jupyter-rendered/jupyter-unbound.conf
+          sudo nft --check --file /tmp/jupyter-rendered/jupyter.nft

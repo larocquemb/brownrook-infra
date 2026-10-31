@@ -1,0 +1,36 @@
+// Managed by brownrook-infra: PVE kernel journals only.
+loki.relabel "kernel" {
+  forward_to = []
+  rule {
+    source_labels = ["__journal_priority_keyword"]
+    target_label = "level"
+  }
+}
+
+loki.source.journal "kernel" {
+  matches = "_TRANSPORT=kernel"
+  max_age = "{{ pve_kernel_logs_max_age }}"
+  format_as_json = true
+  relabel_rules = loki.relabel.kernel.rules
+  labels = {
+    host = "{{ inventory_hostname }}",
+    service = "kernel",
+    environment = "production",
+    collection = "host-kernel-journal",
+  }
+  forward_to = [loki.write.monitoring.receiver]
+}
+
+loki.write "monitoring" {
+  endpoint {
+    url = "{{ pve_kernel_logs_loki_url }}"
+    tls_config {
+      ca_file = "/etc/alloy/tls/ca.crt"
+      cert_file = "/etc/alloy/tls/client.crt"
+      key_file = "/etc/alloy/tls/client.key"
+      server_name = "{{ pve_kernel_logs_loki_hostname }}"
+      min_version = "TLS12"
+    }
+  }
+  wal { enabled = true }
+}

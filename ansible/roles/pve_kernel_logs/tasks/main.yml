@@ -1,0 +1,219 @@
+---
+- name: Require the supported Proxmox host and HTTPS log destination
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.os_family == 'Debian'
+      - pve_kernel_logs_loki_url is match('^https://')
+      - pve_kernel_logs_loki_hostname | length > 0
+
+- name: Check external client identity files on the controller
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ pve_kernel_logs_ca_source }}"
+    - "{{ pve_kernel_logs_cert_source }}"
+    - "{{ pve_kernel_logs_key_source }}"
+  delegate_to: localhost
+  become: false
+  register: pve_kernel_logs_identity
+  no_log: true
+
+- name: Require existing Brownrook mTLS identity
+  ansible.builtin.assert:
+    that:
+      - item.stat.isreg | default(false)
+    fail_msg: Set BROWNROOK_PKI_DIR to the existing Brownrook CA directory with alloy-loki-client identity files.
+  loop: "{{ pve_kernel_logs_identity.results }}"
+  no_log: true
+
+- name: Inspect an existing collector configuration before adoption
+  ansible.builtin.stat:
+    path: /etc/alloy/config.alloy
+    checksum_algorithm: md5
+  register: pve_kernel_logs_existing
+
+- name: Read existing collector ownership marker
+  ansible.builtin.slurp:
+    src: /etc/alloy/config.alloy
+  register: pve_kernel_logs_existing_content
+  when: pve_kernel_logs_existing.stat.exists
+  no_log: true
+
+- name: Read collector state before adopting a package default
+  ansible.builtin.service_facts:
+
+- name: Read package-owned configuration checksums
+  ansible.builtin.command:
+    argv: [dpkg-query, --show, '--showformat=${Conffiles}', alloy]
+    expand_argument_vars: false
+  register: pve_kernel_logs_package_files
+  changed_when: false
+  failed_when: pve_kernel_logs_package_files.rc not in [0, 1]
+  check_mode: false
+  when: pve_kernel_logs_existing.stat.exists
+
+- name: Preserve unrelated Alloy configurations
+  ansible.builtin.assert:
+    that:
+      - >-
+        (pve_kernel_logs_existing_content.content | b64decode).startswith(
+          '// Managed by brownrook-infra: PVE kernel journals only.')
+        or (
+          ('/etc/alloy/config.alloy ' ~ (pve_kernel_logs_existing.stat.checksum | default('missing')))
+            in pve_kernel_logs_package_files.stdout
+          and ansible_facts.services.get('alloy.service', {}).get('state', '') != 'running'
+        )
+    fail_msg: An unrelated Alloy configuration exists on PVE; merge its collection requirements before adoption.
+  when: pve_kernel_logs_existing.stat.exists
+  no_log: true
+
+- name: Create Grafana APT key directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the official Grafana repository signing key
+  ansible.builtin.get_url:
+    url: https://apt.grafana.com/gpg-full.key
+    dest: /etc/apt/keyrings/grafana.asc
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Configure the signed Grafana repository
+  ansible.builtin.copy:
+    content: "deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main\n"
+    dest: /etc/apt/sources.list.d/grafana.list
+    owner: root
+    group: root
+    mode: "0644"
+  register: pve_kernel_logs_repository
+
+- name: Install pinned native Alloy without starting a default collector
+  ansible.builtin.apt:
+    name:
+      - "alloy={{ pve_kernel_logs_alloy_version }}"
+      - curl
+    state: present
+    update_cache: true
+    cache_valid_time: "{{ 0 if pve_kernel_logs_repository.changed else 3600 }}"
+    policy_rc_d: 101
+
+- name: Grant the collector journal reader permissions
+  ansible.builtin.user:
+    name: alloy
+    groups: [adm, systemd-journal]
+    append: true
+  notify: Restart PVE kernel collector
+
+- name: Create protected collector configuration and state directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: alloy
+    mode: "0750"
+  loop:
+    - {path: /etc/alloy/tls, owner: root}
+    - {path: /var/lib/alloy, owner: alloy}
+
+- name: Deploy the external Loki mTLS identity
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "/etc/alloy/tls/{{ item.name }}"
+    owner: root
+    group: alloy
+    mode: "0640"
+  loop:
+    - {src: "{{ pve_kernel_logs_ca_source }}", name: ca.crt}
+    - {src: "{{ pve_kernel_logs_cert_source }}", name: client.crt}
+    - {src: "{{ pve_kernel_logs_key_source }}", name: client.key}
+  no_log: true
+  notify: Restart PVE kernel collector
+
+- name: Check journal access as the actual service user
+  ansible.builtin.command:
+    argv: [/usr/sbin/runuser, -u, alloy, --, journalctl, --no-pager, -n, '1', _TRANSPORT=kernel, --output=json]
+  register: pve_kernel_logs_journal_probe
+  changed_when: false
+  failed_when: "'MESSAGE' not in pve_kernel_logs_journal_probe.stdout"
+  when: not ansible_check_mode
+
+- name: Validate Loki mTLS without depending on DNS
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --silent
+      - --show-error
+      - --fail
+      - --max-time
+      - '10'
+      - --noproxy
+      - '*'
+      - --resolve
+      - "{{ pve_kernel_logs_loki_hostname }}:3100:{{ pve_kernel_logs_loki_address }}"
+      - --cacert
+      - /etc/alloy/tls/ca.crt
+      - --cert
+      - /etc/alloy/tls/client.crt
+      - --key
+      - /etc/alloy/tls/client.key
+      - "https://{{ pve_kernel_logs_loki_hostname }}:3100/ready"
+  register: pve_kernel_logs_loki_ready
+  changed_when: false
+  retries: 20
+  delay: 2
+  until: pve_kernel_logs_loki_ready.rc == 0
+  when: not ansible_check_mode
+
+- name: Install the validated kernel-only collector
+  ansible.builtin.template:
+    src: config.alloy.j2
+    dest: /etc/alloy/config.alloy
+    owner: root
+    group: alloy
+    mode: "0640"
+    validate: /usr/bin/alloy validate %s
+  notify: Restart PVE kernel collector
+
+- name: Create the dedicated collector service override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/alloy.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Keep collector state persistent and administration private
+  ansible.builtin.template:
+    src: service.conf.j2
+    dest: /etc/systemd/system/alloy.service.d/pve-kernel.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart PVE kernel collector
+
+- name: Apply validated collector changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable PVE kernel log forwarding
+  ansible.builtin.systemd_service:
+    name: alloy
+    daemon_reload: true
+    state: started
+    enabled: true
+  when: not ansible_check_mode
+
+- name: Verify the collector is ready
+  ansible.builtin.uri:
+    url: http://127.0.0.1:12345/-/ready
+    use_proxy: false
+    status_code: 200
+  register: pve_kernel_logs_ready
+  retries: 10
+  delay: 2
+  until: pve_kernel_logs_ready.status == 200
+  when: not ansible_check_mode

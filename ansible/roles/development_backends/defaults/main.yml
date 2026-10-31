@@ -1,0 +1,9 @@
+---
+development_backends_user: brownrook-dev
+development_backends_home: /home/brownrook-dev
+development_backends_address: 192.168.2.201
+development_backends_sources: [192.168.2.0/24, 10.6.0.0/24, 127.0.0.0/8]
+development_backends_postgres_image: ghcr.io/larocquemb/home-budget-postgres:18.6-oidc-7b6565afbc56bc8abcb75939d28c898377a10f00
+development_backends_rabbit_image: docker.io/library/rabbitmq:4.1-management
+development_backends_neo4j_image: docker.io/library/neo4j:5.26.31-community
+development_backends_services: [postgres, rabbitmq, neo4j]

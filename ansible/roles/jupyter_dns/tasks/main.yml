@@ -1,0 +1,26 @@
+---
+- name: Install the internal Jupyter DNS override
+  ansible.builtin.template:
+    src: jupyter.conf.j2
+    dest: /etc/unbound/unbound.conf.d/jupyter.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload Jupyter Unbound
+
+- name: Apply DNS configuration before verification
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify internal Jupyter DNS points to the proxy
+  ansible.builtin.command:
+    argv:
+      - dig
+      - "@127.0.0.1"
+      - "{{ item }}"
+      - A
+      - +short
+  loop: "{{ [jupyter_hostname, jupyter_internal_hostname] }}"
+  register: jupyter_dns_answer
+  changed_when: false
+  failed_when: jupyter_dns_answer.stdout != jupyter_proxy_ip
+  when: not ansible_check_mode

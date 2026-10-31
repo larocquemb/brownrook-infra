@@ -1,0 +1,43 @@
+---
+name: Validate development Podman backends
+on:
+  pull_request:
+    paths: ["ansible/roles/development_backends/**", "ansible/playbooks/development-backends.yml", "ansible/playbooks/validate-development-backends.yml", "scripts/development/**", ".github/workflows/validate-development-backends.yml"]
+  push:
+    branches: [main]
+    paths: ["ansible/roles/development_backends/**", "ansible/playbooks/development-backends.yml", "ansible/playbooks/validate-development-backends.yml", "scripts/development/**", ".github/workflows/validate-development-backends.yml"]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Install validation tools
+        run: python -m pip install -r requirements-dev.txt
+      - name: Render synthetic backend contracts
+        run: python scripts/development/validate_templates.py .validation/development
+      - name: Validate playbook
+        env:
+          BROWNROOK_DEV_SECRETS_FILE: "${{ github.workspace }}/.validation/development/synthetic-secrets.yml"
+        run: |
+          ansible-playbook --syntax-check ansible/playbooks/development-backends.yml
+          ansible-playbook --syntax-check ansible/playbooks/validate-development-backends.yml
+          ansible-lint ansible/playbooks/development-backends.yml
+          ansible-lint ansible/playbooks/validate-development-backends.yml
+      - name: Validate Quadlets with Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman nftables
+          mkdir -p .validation/quadlets
+          cp .validation/development/*.container .validation/quadlets/
+          for name in postgres rabbitmq neo4j; do
+            printf '[Volume]\nVolumeName=brownrook-dev-%s\n' "$name" > ".validation/quadlets/brownrook-dev-$name.volume"
+            mv ".validation/quadlets/$name.container" ".validation/quadlets/brownrook-dev-$name.container"
+          done
+          printf '[Network]\nNetworkName=brownrook-dev\n' > .validation/quadlets/brownrook-dev.network
+          QUADLET_UNIT_DIRS="$PWD/.validation/quadlets" /usr/lib/systemd/system-generators/podman-system-generator --dryrun

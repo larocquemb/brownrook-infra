@@ -1,0 +1,5 @@
+---
+k3s_data_filesystem_disk: /dev/sda
+k3s_data_filesystem_partition: /dev/sda1
+k3s_data_filesystem_mount: /build
+k3s_data_filesystem_target_gib: 120

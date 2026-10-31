@@ -1,0 +1,21 @@
+[Unit]
+Description=Arsene JupyterLab
+Wants=network-online.target
+Requires=jupyter-arsene-firewall.service
+After=network-online.target jupyter-arsene-firewall.service
+
+[Service]
+User={{ jupyter_user }}
+Group={{ jupyter_group }}
+WorkingDirectory={{ jupyter_notebooks_dir }}
+Environment=HOME={{ jupyter_home }}
+Environment="OLLAMA_HOST={{ jupyter_ollama_url }}"
+Environment="OLLAMA_BASE_URL={{ jupyter_ollama_url }}"
+# A system executable is required before opening the home-directory venv on Arsene.
+ExecStart=/usr/bin/bash -c 'exec {{ jupyter_home }}/venvs/jupyter/bin/python -m jupyterlab'
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

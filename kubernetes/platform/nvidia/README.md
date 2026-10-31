@@ -112,3 +112,24 @@ Final state:
 - k3s1: `v1.36.4+k3s1`, containerd `2.3.4-k3s1.36`
 - arsene: `v1.36.4+k3s1`, containerd `2.3.4-k3s1.36`
 - both nodes: `Ready`
+
+## Red Hat catalog CUDA validation image
+
+The CUDA visibility test now selects Red Hat's AI CUDA 13.0 RHEL9 image,
+pinned by digest in `cuda-test.yaml`. Catalog entry:
+<https://catalog.redhat.com/en/software/containers/rhai/base-image-cuda-13.0-rhel9/697afa2871e1ee36cfe24ce5>.
+
+On 2026-10-17, the `3.5.4-1791819495` image was pulled successfully on Arsene
+as amd64 and run with rootless Podman/CDI. `nvidia-smi` detected the RTX 3090,
+24576 MiB VRAM, and driver 615.71.09. This establishes registry access and
+GPU visibility, not CUDA computation, model inference, or vendor support
+coverage. The earlier Kubernetes validation above used NVIDIA's UBI9 image;
+the Red Hat replacement has not yet been validated in Kubernetes.
+
+The Kubernetes runtime needs registry credentials in an image pull secret in
+the test pod's namespace. Arsene's Podman registry login does not configure
+k3s/containerd authentication. Keep credentials outside Git. The CUDA test pod
+is a manual diagnostic and remains excluded from `kustomization.yaml`.
+This change does not switch native Ollama, Jupyter, host drivers, or CUDA toolkit
+packages. Support for this Red Hat AI image must be checked separately from
+RHEL Premium subscription availability.

@@ -1,0 +1,14 @@
+---
+- name: Reload Jupyter systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+- name: Restart Jupyter firewall
+  ansible.builtin.systemd_service:
+    name: jupyter-arsene-firewall
+    state: restarted
+
+- name: Restart Jupyter
+  ansible.builtin.systemd_service:
+    name: jupyter-arsene
+    state: restarted

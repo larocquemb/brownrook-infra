@@ -1,0 +1,5 @@
+---
+arsene_database_storage_source: /build/k3s/storage
+arsene_database_storage_root: /home/brownrook-k3s-storage
+arsene_database_storage_pvc_directory: pvc-104ddbc8-6b63-4261-84bf-b6c5e785bc3e_home-budget_data-neo4j-0
+arsene_database_storage_context: brownrook-k3s1

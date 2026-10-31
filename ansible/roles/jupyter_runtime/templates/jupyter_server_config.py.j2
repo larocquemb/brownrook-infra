@@ -1,0 +1,10 @@
+# Managed by Ansible; the password remains in the adjacent host-only JSON file.
+c = get_config()
+c.ServerApp.ip = {{ jupyter_backend_ip | to_json }}
+c.ServerApp.port = {{ jupyter_backend_port }}
+c.ServerApp.port_retries = 0
+c.ServerApp.open_browser = False
+c.ServerApp.root_dir = {{ jupyter_notebooks_dir | to_json }}
+c.ServerApp.trust_xheaders = True
+c.ServerApp.local_hostnames = ["localhost", {{ jupyter_hostname | to_json }}, {{ jupyter_internal_hostname | to_json }}]
+c.PasswordIdentityProvider.password_required = True

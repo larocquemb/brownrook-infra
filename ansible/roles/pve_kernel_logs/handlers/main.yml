@@ -1,0 +1,7 @@
+---
+- name: Restart PVE kernel collector
+  ansible.builtin.systemd_service:
+    name: alloy
+    daemon_reload: true
+    state: restarted
+  when: not ansible_check_mode

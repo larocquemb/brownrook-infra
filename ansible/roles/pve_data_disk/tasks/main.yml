@@ -1,0 +1,45 @@
+---
+- name: Read the existing VM configuration
+  ansible.builtin.command: qm config {{ pve_data_disk_vmid }}
+  register: pve_data_disk_config
+  changed_when: false
+  check_mode: false
+
+- name: Read the current data disk size
+  ansible.builtin.set_fact:
+    pve_data_disk_line: "{{ pve_data_disk_config.stdout_lines | select('match', '^' ~ pve_data_disk_name ~ ': ') | first }}"
+
+- name: Verify the exact existing data disk
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname == 'pve'
+      - >-
+        pve_data_disk_line.startswith(pve_data_disk_name ~ ': ' ~ pve_data_disk_volume ~ ',')
+      - pve_data_disk_line is search('size=[0-9]+G($|,)')
+      - pve_data_disk_target_gib | int >= (pve_data_disk_line.split('size=')[1].split('G')[0] | int)
+    fail_msg: Refusing an unexpected VM disk or any disk shrink.
+
+- name: Resolve the existing disk image path
+  ansible.builtin.command: pvesm path {{ pve_data_disk_volume }}
+  register: pve_data_disk_path
+  changed_when: false
+  check_mode: false
+
+- name: Check backing filesystem free space
+  ansible.builtin.command: df -B1 --output=avail {{ pve_data_disk_path.stdout }}
+  register: pve_data_disk_free
+  changed_when: false
+  check_mode: false
+
+- name: Require expansion headroom and a host reserve
+  ansible.builtin.assert:
+    that:
+      - >-
+        pve_data_disk_free.stdout_lines[-1] | trim | int >
+        ((pve_data_disk_target_gib | int - (pve_data_disk_line.split('size=')[1].split('G')[0] | int))
+        + pve_data_disk_reserve_gib | int) * 1073741824
+
+- name: Grow the PVE virtual data disk without replacing it
+  ansible.builtin.command: qm disk resize {{ pve_data_disk_vmid }} {{ pve_data_disk_name }} {{ pve_data_disk_target_gib }}G
+  when: (pve_data_disk_line.split('size=')[1].split('G')[0] | int) < pve_data_disk_target_gib | int
+  changed_when: true

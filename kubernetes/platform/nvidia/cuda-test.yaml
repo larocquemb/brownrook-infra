@@ -9,7 +9,7 @@ spec:
     kubernetes.io/hostname: arsene
   containers:
     - name: cuda-test
-      image: nvidia/cuda:13.0.2-base-ubi9
+      image: registry.redhat.io/rhai/base-image-cuda-13.0-rhel9@sha256:50c435bc8aa6011077a326627f496f82ce4b752f04b67aa68f74469871efb53f
       command: ["nvidia-smi"]
       resources:
         limits:
