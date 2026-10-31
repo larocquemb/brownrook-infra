@@ -1,0 +1,14 @@
+---
+- name: Expand the existing PVE-backed k3s1 data disk
+  hosts: pve
+  gather_facts: false
+  become: false
+  roles:
+    - role: pve_data_disk
+
+- name: Expand the existing k3s1 partition and XFS filesystem online
+  hosts: k3s1
+  gather_facts: false
+  become: true
+  roles:
+    - role: k3s_data_filesystem

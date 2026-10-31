@@ -1,0 +1,6 @@
+---
+pve_data_disk_vmid: 300
+pve_data_disk_name: scsi1
+pve_data_disk_volume: ssd:300/vm-300-disk-0.raw
+pve_data_disk_target_gib: 120
+pve_data_disk_reserve_gib: 30

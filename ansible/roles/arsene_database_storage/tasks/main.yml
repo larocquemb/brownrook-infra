@@ -1,0 +1,355 @@
+---
+- name: Verify migration host and fixed source paths
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname == 'arsene'
+      - arsene_database_storage_source == '/build/k3s/storage'
+      - arsene_database_storage_root == '/home/brownrook-k3s-storage'
+
+- name: Verify source and destination filesystems
+  ansible.builtin.command: findmnt -n -o SOURCE,FSTYPE --target {{ item }}
+  loop: [/build, /home]
+  register: arsene_database_storage_filesystems
+  changed_when: false
+  check_mode: false
+
+- name: Require the known larger local XFS filesystem
+  ansible.builtin.assert:
+    that:
+      - arsene_database_storage_filesystems.results[1].stdout == '/dev/mapper/rhel-home xfs'
+
+- name: Check whether storage has already been switched
+  ansible.builtin.command: mountpoint -q {{ arsene_database_storage_source }}
+  register: arsene_database_storage_mounted
+  failed_when: arsene_database_storage_mounted.rc not in [0, 32]
+  changed_when: false
+  check_mode: false
+
+- name: Verify an existing bind mount points to the managed directory
+  when: arsene_database_storage_mounted.rc == 0
+  block:
+    - name: Inspect source and destination directory identities
+      ansible.builtin.command: stat -c %d:%i {{ item }}
+      loop:
+        - "{{ arsene_database_storage_source }}"
+        - "{{ arsene_database_storage_root }}/live"
+      register: arsene_database_storage_identities
+      changed_when: false
+      check_mode: false
+
+    - name: Require the expected mounted directory
+      ansible.builtin.assert:
+        that:
+          - arsene_database_storage_identities.results[0].stdout == arsene_database_storage_identities.results[1].stdout
+
+- name: Mark the current source safe to resume before maintenance
+  ansible.builtin.set_fact:
+    arsene_database_storage_safe_to_resume: true
+
+- name: Migrate the stopped Neo4j volume to the larger local filesystem
+  when: arsene_database_storage_mounted.rc != 0 and not ansible_check_mode
+  block:
+    - name: Inspect existing local volumes before stopping anything
+      ansible.builtin.command:
+        argv: [find, "{{ arsene_database_storage_source }}", -mindepth, '1', -maxdepth, '1', -printf, '%f\n']
+      register: arsene_database_storage_entries
+      changed_when: false
+
+    - name: Require that Neo4j is the only local volume on Arsene
+      ansible.builtin.assert:
+        that:
+          - arsene_database_storage_entries.stdout_lines == [arsene_database_storage_pvc_directory]
+
+    - name: Inspect paths which must not be overwritten
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ arsene_database_storage_root }}/live"
+        - "{{ arsene_database_storage_root }}/retained-before-migration"
+        - "{{ arsene_database_storage_source }}.before-home-migration"
+      register: arsene_database_storage_existing
+
+    - name: Require a fresh destination or an already completed migration
+      ansible.builtin.assert:
+        that:
+          - not (arsene_database_storage_existing.results | selectattr('stat.exists') | list | length)
+        fail_msg: Existing migration copies require manual review; never overwrite retained evidence.
+
+    - name: Inspect storage usage and available destination capacity
+      ansible.builtin.command: "{{ item }}"
+      loop:
+        - du -s -B1 {{ arsene_database_storage_source }}
+        - df -B1 --output=avail /home
+      register: arsene_database_storage_capacity
+      changed_when: false
+
+    - name: Require space for live data, a retained original copy, and a reserve
+      ansible.builtin.assert:
+        that:
+          - >-
+            arsene_database_storage_capacity.results[1].stdout_lines[-1] | trim | int >
+            arsene_database_storage_capacity.results[0].stdout.split()[0] | int * 2 + 53687091200
+
+    - name: Verify the production graph volume still maps to this host path
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --context
+          - "{{ arsene_database_storage_context }}"
+          - get
+          - pv
+          - pvc-104ddbc8-6b63-4261-84bf-b6c5e785bc3e
+          - -o
+          - json
+      delegate_to: localhost
+      become: false
+      register: arsene_database_storage_pv
+      changed_when: false
+
+    - name: Verify the current volume identity
+      ansible.builtin.assert:
+        that:
+          - (arsene_database_storage_pv.stdout | from_json).spec.local.path == arsene_database_storage_source ~ '/' ~ arsene_database_storage_pvc_directory
+          - (arsene_database_storage_pv.stdout | from_json).spec.claimRef.name == 'data-neo4j-0'
+
+    - name: Read the current application reconciliation settings
+      ansible.builtin.command: kubectl --context {{ arsene_database_storage_context }} -n argocd get application ledger -o json
+      delegate_to: localhost
+      become: false
+      register: arsene_database_storage_application
+      changed_when: false
+
+    - name: Require normal application reconciliation before managed maintenance
+      ansible.builtin.assert:
+        that:
+          - >-
+            (arsene_database_storage_application.stdout | from_json).metadata.annotations.get('argocd.argoproj.io/skip-reconcile', 'false') == 'false'
+
+    - name: Perform storage maintenance with application reconciliation restored on exit
+      block:
+        - name: Pause Argo reconciliation during the volume migration
+          ansible.builtin.command: >-
+            kubectl --context {{ arsene_database_storage_context }} -n argocd annotate application ledger
+            argocd.argoproj.io/skip-reconcile=true --overwrite
+          delegate_to: localhost
+          become: false
+          changed_when: true
+
+        - name: Stop the graph database cleanly
+          ansible.builtin.command: kubectl --context {{ arsene_database_storage_context }} -n home-budget scale statefulset neo4j --replicas=0
+          delegate_to: localhost
+          become: false
+          changed_when: true
+
+        - name: Wait for the database pod and its volume mount to terminate
+          ansible.builtin.command: kubectl --context {{ arsene_database_storage_context }} -n home-budget wait --for=delete pod/neo4j-0 --timeout=180s
+          delegate_to: localhost
+          become: false
+          changed_when: false
+
+        - name: Create private storage and retained-data directories
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: directory
+            owner: root
+            group: root
+            mode: '0700'
+          loop:
+            - "{{ arsene_database_storage_root }}"
+            - "{{ arsene_database_storage_root }}/retained-before-migration"
+            - "{{ arsene_database_storage_root }}/live"
+
+        - name: Retain original data with numeric owners, hard links, ACLs and SELinux attributes
+          ansible.builtin.command:
+            argv:
+              - rsync
+              - -aHAXS
+              - --numeric-ids
+              - "{{ arsene_database_storage_source }}/"
+              - "{{ arsene_database_storage_root }}/retained-before-migration/"
+          changed_when: true
+
+        - name: Prepare the live data copy on the larger filesystem
+          ansible.builtin.command:
+            argv:
+              - rsync
+              - -aHAXS
+              - --numeric-ids
+              - "{{ arsene_database_storage_root }}/retained-before-migration/"
+              - "{{ arsene_database_storage_root }}/live/"
+          changed_when: true
+
+        - name: Verify both copies against the stopped original with content checksums
+          ansible.builtin.command:
+            argv:
+              - rsync
+              - -aHAXSnci
+              - --numeric-ids
+              - --delete
+              - "{{ arsene_database_storage_source }}/"
+              - "{{ arsene_database_storage_root }}/{{ item }}/"
+          loop: [retained-before-migration, live]
+          register: arsene_database_storage_verification
+          changed_when: false
+          failed_when: arsene_database_storage_verification.rc != 0 or arsene_database_storage_verification.stdout | length > 0
+
+        - name: Guard against restarting on an incomplete storage switch
+          ansible.builtin.set_fact:
+            arsene_database_storage_safe_to_resume: false
+
+        - name: Move the old source aside without changing its contents
+          ansible.builtin.command:
+            argv: [mv, "{{ arsene_database_storage_source }}", "{{ arsene_database_storage_source }}.before-home-migration"]
+            creates: "{{ arsene_database_storage_source }}.before-home-migration"
+          changed_when: true
+
+        - name: Create the original mountpoint
+          ansible.builtin.file:
+            path: "{{ arsene_database_storage_source }}"
+            state: directory
+            owner: root
+            group: root
+            mode: '0700'
+
+        - name: Persist and activate the verified bind mount
+          ansible.posix.mount:
+            src: "{{ arsene_database_storage_root }}/live"
+            path: "{{ arsene_database_storage_source }}"
+            fstype: none
+            opts: bind,x-systemd.requires-mounts-for=/home
+            state: mounted
+            backup: true
+
+        - name: Allow the database to resume on the verified bind mount
+          ansible.builtin.set_fact:
+            arsene_database_storage_safe_to_resume: true
+
+      rescue:
+        - name: Inspect whether the original directory was moved aside
+          ansible.builtin.stat:
+            path: "{{ arsene_database_storage_source }}.before-home-migration"
+          register: arsene_database_storage_original
+
+        - name: Roll back an incomplete switch before allowing database restart
+          when: arsene_database_storage_original.stat.exists
+          block:
+            - name: Unmount an incomplete new bind mount
+              ansible.posix.mount:
+                path: "{{ arsene_database_storage_source }}"
+                state: unmounted
+
+            - name: Remove the new bind mount from fstab during rollback
+              ansible.posix.mount:
+                path: "{{ arsene_database_storage_source }}"
+                state: absent_from_fstab
+
+            - name: Remove only an empty replacement mountpoint
+              ansible.builtin.command: rmdir {{ arsene_database_storage_source }}
+              changed_when: true
+
+            - name: Restore the original directory atomically
+              ansible.builtin.command: mv {{ arsene_database_storage_source }}.before-home-migration {{ arsene_database_storage_source }}
+              changed_when: true
+
+        - name: Verify that the original database directory exists before restart
+          ansible.builtin.stat:
+            path: "{{ arsene_database_storage_source }}/{{ arsene_database_storage_pvc_directory }}/databases/neo4j"
+          register: arsene_database_storage_restored
+
+        - name: Refuse restart if original storage has not been restored
+          ansible.builtin.assert:
+            that:
+              - arsene_database_storage_restored.stat.isdir | default(false)
+
+        - name: Mark the original source safe after successful rollback
+          ansible.builtin.set_fact:
+            arsene_database_storage_safe_to_resume: true
+
+        - name: Report the failed migration without deleting any retained data
+          ansible.builtin.fail:
+            msg: Migration failed and original storage was restored. Retained copies remain for review.
+      always:
+        - name: Restore the graph database replica
+          when: arsene_database_storage_safe_to_resume
+          ansible.builtin.command: kubectl --context {{ arsene_database_storage_context }} -n home-budget scale statefulset neo4j --replicas=1
+          delegate_to: localhost
+          become: false
+          changed_when: true
+
+        - name: Resume normal Argo reconciliation
+          when: arsene_database_storage_safe_to_resume
+          ansible.builtin.command: >-
+            kubectl --context {{ arsene_database_storage_context }} -n argocd annotate application ledger
+            argocd.argoproj.io/skip-reconcile-
+          delegate_to: localhost
+          become: false
+          changed_when: true
+
+- name: Ensure the node agent waits for database storage on boot
+  when: not ansible_check_mode
+  block:
+    - name: Create the k3s agent systemd override directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/k3s-agent.service.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Require the persistent database mount before k3s agent startup
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/k3s-agent.service.d/database-storage.conf
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Unit]
+          RequiresMountsFor=/home /build/k3s/storage
+      notify: Reload systemd for database storage
+
+    - name: Apply the storage dependency before completing maintenance
+      ansible.builtin.meta: flush_handlers
+
+    - name: Wait for the graph database container to become ready
+      ansible.builtin.command: kubectl --context {{ arsene_database_storage_context }} -n home-budget rollout status statefulset/neo4j --timeout=180s
+      delegate_to: localhost
+      become: false
+      changed_when: false
+
+    - name: Verify that the actual Neo4j database is online
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --context
+          - "{{ arsene_database_storage_context }}"
+          - -n
+          - home-budget
+          - exec
+          - deployment/ledger-web
+          - --
+          - python
+          - -c
+          - >-
+            import os,json;
+            from neo4j import GraphDatabase;
+            d=GraphDatabase.driver(os.environ['NEO4J_URI'],auth=(os.environ['NEO4J_USER'],os.environ['NEO4J_PASSWORD']));
+            s=d.session(database='system');
+            rows=[dict(r) for r in s.run('SHOW DATABASES YIELD name,currentStatus RETURN name,currentStatus')];
+            print(json.dumps(rows));
+            assert any(r['name']=='neo4j' and r['currentStatus']=='online' for r in rows), 'Receipt graph database remains offline'
+      delegate_to: localhost
+      become: false
+      register: arsene_database_storage_online
+      retries: 6
+      delay: 10
+      until: arsene_database_storage_online.rc == 0
+      changed_when: false
+
+    - name: Remove the obsolete root-filesystem copy only after verified recovery
+      ansible.builtin.file:
+        path: "{{ arsene_database_storage_source }}.before-home-migration"
+        state: absent
+
+    - name: Read back root and database filesystem free space
+      ansible.builtin.command: df -h / {{ arsene_database_storage_source }}
+      changed_when: false
