@@ -1,4 +1,5 @@
 export ANSIBLE_COLLECTIONS_PATH := $(CURDIR)/.ansible/collections:$(HOME)/.ansible/collections:/usr/share/ansible/collections
+PYTHON ?= python3
 ANSIBLE_PLAYBOOK ?= ansible-playbook
 ANSIBLE_ARGS ?=
 
@@ -18,3 +19,10 @@ storage-k3s1: storage-deps
 
 storage-arsene: storage-deps
 	$(ANSIBLE_PLAYBOOK) ansible/playbooks/database-storage-arsene.yml $(ANSIBLE_ARGS)
+
+.PHONY: development-check
+development-check:
+	$(PYTHON) scripts/development/validate_templates.py .validation/development
+	BROWNROOK_DEV_SECRETS_FILE="$(CURDIR)/.validation/development/synthetic-secrets.yml" $(ANSIBLE_PLAYBOOK) --syntax-check ansible/playbooks/development-backends.yml
+	$(ANSIBLE_PLAYBOOK) --syntax-check ansible/playbooks/validate-development-backends.yml
+	ansible-lint ansible/playbooks/development-backends.yml ansible/playbooks/validate-development-backends.yml
