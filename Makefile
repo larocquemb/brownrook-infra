@@ -26,3 +26,11 @@ development-check:
 	BROWNROOK_DEV_SECRETS_FILE="$(CURDIR)/.validation/development/synthetic-secrets.yml" $(ANSIBLE_PLAYBOOK) --syntax-check ansible/playbooks/development-backends.yml
 	$(ANSIBLE_PLAYBOOK) --syntax-check ansible/playbooks/validate-development-backends.yml
 	ansible-lint ansible/playbooks/development-backends.yml ansible/playbooks/validate-development-backends.yml
+
+.PHONY: ha-check ha-preflight
+ha-check:
+	@for script in scripts/kan-132/*.sh; do bash -n "$$script" || exit; done
+	$(PYTHON) -m pytest -q tests/kan132
+
+ha-preflight:
+	bash scripts/kan-132/preflight.sh

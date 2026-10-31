@@ -1,0 +1,37 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: brownrook-block-rwo
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    storage.brownrook.net/portable-profile: block-rwo
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  dataEngine: v1
+  dataLocality: best-effort
+  fsType: xfs
+  numberOfReplicas: "3"
+  replicaSoftAntiAffinity: disabled
+  staleReplicaTimeout: "2880"
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: brownrook-files-rwx
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    storage.brownrook.net/portable-profile: files-rwx
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  dataEngine: v1
+  dataLocality: best-effort
+  fsType: xfs
+  numberOfReplicas: "3"
+  replicaSoftAntiAffinity: disabled
+  staleReplicaTimeout: "2880"
